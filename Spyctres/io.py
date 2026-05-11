@@ -173,10 +173,91 @@ class SpectrumSegment(object):
             wave_frame=self.wave_frame if wave_frame is None else wave_frame,
             name=out_name,
         )
+
+
+class SpectrumCollection(object):
+    """
+    Thin container for a joint fit over multiple SpectrumSegment objects.
+
+    Parameters
+    ----------
+    segments : SpectrumSegment or sequence of SpectrumSegment
+        Segment objects to be grouped together.
+    weights : array-like, optional
+        Positive per-segment weights used by joint fitting. If None, all
+        segments receive unit weight.
+    meta : dict, optional
+        Optional collection-level metadata.
+    name : str, optional
+        Optional collection name.
+    """
+
+    def __init__(self, segments, weights=None, meta=None, name=None):
+        if isinstance(segments, SpectrumSegment):
+            segments = [segments]
+        else:
+            segments = list(segments)
+
+        if len(segments) == 0:
+            raise ValueError("SpectrumCollection requires at least one SpectrumSegment.")
+
+        for i, seg in enumerate(segments):
+            if not isinstance(seg, SpectrumSegment):
+                raise TypeError(
+                    "All entries in SpectrumCollection must be SpectrumSegment objects; "
+                    "got type {0} at index {1}.".format(type(seg).__name__, i)
+                )
+
+        self.segments = list(segments)
+
+        if weights is None:
+            self.weights = np.ones(len(self.segments), dtype=float)
+        else:
+            w = np.asarray(weights, dtype=float)
+            if w.ndim != 1 or len(w) != len(self.segments):
+                raise ValueError("weights must be 1D and match the number of segments.")
+            if not np.all(np.isfinite(w)):
+                raise ValueError("weights must be finite.")
+            if np.any(w <= 0):
+                raise ValueError("weights must be > 0.")
+            self.weights = np.array(w, copy=True, dtype=float)
+
+        self.meta = {} if meta is None else dict(meta)
+        self.name = name
+
+    def __len__(self):
+        return len(self.segments)
+
+    def __iter__(self):
+        return iter(self.segments)
+
+    def __getitem__(self, item):
+        return self.segments[item]
+
+    def copy(self, segments=None, weights=None, meta=None, name=None):
+        return SpectrumCollection(
+            list(self.segments) if segments is None else segments,
+            weights=np.array(self.weights, copy=True) if weights is None else weights,
+            meta=self.meta if meta is None else meta,
+            name=self.name if name is None else name,
+        )
+
+    @property
+    def names(self):
+        return [seg.name for seg in self.segments]
         
         
 def concatenate_segments(segments, sort=True, name=None):
-    """Concatenate multiple SpectrumSegment objects into one."""
+    """
+    Concatenate multiple SpectrumSegment objects into a single SpectrumSegment.
+
+    If all input segments share the same wavelength medium and frame, those are
+    preserved. Otherwise they are set to "unknown" on the merged segment.
+    """
+    segments = list(segments)
+    if len(segments) == 0:
+        raise ValueError("concatenate_segments requires at least one segment.")
+
     wave = np.concatenate([s.wave for s in segments])
     flux = np.concatenate([s.flux for s in segments])
 
@@ -187,8 +268,27 @@ def concatenate_segments(segments, sort=True, name=None):
 
     mask = np.concatenate([s.mask for s in segments])
 
-    meta = {"n_segments": len(segments), "segment_names": [s.name for s in segments]}
-    out = SpectrumSegment(wave, flux, err=err, mask=mask, meta=meta, name=name)
+    media = {str(s.wave_medium).lower() for s in segments}
+    frames = {str(s.wave_frame).lower() for s in segments}
+    wave_medium = next(iter(media)) if len(media) == 1 else "unknown"
+    wave_frame = next(iter(frames)) if len(frames) == 1 else "unknown"
+
+    meta = {
+        "n_segments": len(segments),
+        "segment_names": [s.name for s in segments],
+        "wave_medium": wave_medium,
+        "wave_frame": wave_frame,
+    }
+    out = SpectrumSegment(
+        wave,
+        flux,
+        err=err,
+        mask=mask,
+        meta=meta,
+        wave_medium=wave_medium,
+        wave_frame=wave_frame,
+        name=name,
+    )
     return out.sorted() if sort else out
 
 
@@ -311,9 +411,6 @@ def make_padded_window_segments(seg, windows, pad=5.0, name_prefix=None):
 
     return out
 
-
-def _header_get(hdr, key, default=None):
-    return hdr[key] if key in hdr else default
 
 
 def _pepsi_fiber_to_resolution(fiber):
@@ -989,7 +1086,16 @@ register_reader(["gemini", "gmos", "gemini_gmos", "gmos_ascii", "gemini_ascii"],
   
 def read_spectrum(path, instrument=None, **kwargs):
     """
-    Dispatcher for supported 1D spectrum readers.
+    Dispatch to one of the registered 1D spectrum readers.
+
+    Parameters
+    ----------
+    path : str
+        Input file path.
+    instrument : str
+        Reader alias such as "pepsi", "xshooter", "floyds", or "gemini".
+    **kwargs
+        Additional reader-specific keyword arguments.
     """
     inst = (instrument or "").strip().lower()
     func = READERS.get(inst, None)

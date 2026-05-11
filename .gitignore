@@ -9,3 +9,6 @@ dist/
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Files to ignore
+scripts/phoenix_backend_compare.py

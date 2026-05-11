@@ -290,6 +290,44 @@ class PhoenixLibrary(object):
         spline = InterpolatedUnivariateSpline(template_wave[mask], flux[mask], k=3, ext=1)
         return wave, spline(wave)
 
+    def _prepare_resampling_grid(self, observed_wave, observed_wave_medium):
+        """
+        Precompute the PHOENIX wavelength grid transformed into the requested
+        observed wavelength medium, along with the overlap mask used for all
+        templates in this interpolator build.
+        """
+        observed_wave = _as_float_array(observed_wave)
+        observed_wave_medium = (
+            self.phoenix_wave_medium
+            if observed_wave_medium is None
+            else str(observed_wave_medium).lower()
+        )
+
+        template_wave = self.phoenix_wave
+        if observed_wave_medium != self.phoenix_wave_medium:
+            template_wave = convert_wavelength_medium(
+                template_wave,
+                from_medium=self.phoenix_wave_medium,
+                to_medium=observed_wave_medium,
+            )
+
+        wmin, wmax = float(observed_wave.min()), float(observed_wave.max())
+        mask = (template_wave >= wmin) & (template_wave <= wmax)
+        if mask.sum() < 4:
+            raise ValueError("Requested wave range does not overlap PHOENIX wave grid.")
+
+        return template_wave[mask], mask
+
+    def _resample_template_fast(self, path, wave_clip, mask, observed_wave):
+        """
+        Fast path for build_interpolator(): read flux, apply precomputed overlap
+        mask, and resample onto observed_wave without repeating wavelength-medium
+        conversion or overlap calculations for every template.
+        """
+        flux = fits.getdata(path).astype(float)[mask]
+        spline = InterpolatedUnivariateSpline(wave_clip, flux, k=3, ext=1)
+        return spline(observed_wave)
+        
     @staticmethod
     def _default_cache_name(teff_grid, feh_grid, logg_grid, wave):
         h = hashlib.md5()
@@ -308,11 +346,37 @@ class PhoenixLibrary(object):
                        cache_path=None,
                        allow_missing=False):
         """
-        Build (or load) a RegularGridInterpolator on (Teff, [Fe/H], logg).
-        The templates are resampled onto observed_wave and stored in memory (and optionally cached).
+        Build or load a RegularGridInterpolator on (Teff, [Fe/H], logg).
 
-        If cache_path exists, it will be loaded.
-        If cache_path is None, nothing is written to disk.
+        The interpolator is defined on `observed_wave`, i.e. an observed-grid
+        backend. For performance, the PHOENIX wavelength grid is transformed into
+        the requested wavelength medium and clipped to the observed wavelength
+        range once per build, then each template flux array is resampled using
+        that precomputed support.
+
+        If `cache_path` exists and matches the requested wavelength grid, parameter
+        axes, and wavelength-medium metadata, the cached flux cube is loaded.
+        Otherwise the cube is rebuilt and optionally written back to disk.
+
+        Parameters
+        ----------
+        observed_wave : array-like
+            Target wavelength grid for the interpolator.
+        teff_grid, feh_grid, logg_grid : array-like or None
+            Parameter axes for the PHOENIX cube. If None, use the default axes.
+        observed_wave_medium : {"air", "vacuum"} or None
+            Wavelength medium of `observed_wave`. If None, assume the PHOENIX
+            native wavelength medium.
+        cache_path : str or None
+            Optional path to an on-disk cache of the resampled flux cube.
+        allow_missing : bool
+            If True, missing templates are skipped and left as NaN in the flux cube.
+            If False, missing templates raise immediately.
+
+        Returns
+        -------
+        scipy.interpolate.RegularGridInterpolator
+            Interpolator returning flux on `observed_wave`.
         """
         observed_wave = _as_float_array(observed_wave)
         observed_wave_medium = (
@@ -321,11 +385,11 @@ class PhoenixLibrary(object):
             else str(observed_wave_medium).lower()
         )
         self.wave = observed_wave.copy()
-
-        teff_grid = self.DEFAULT_TEFF_GRID if teff_grid is None else np.asarray(teff_grid, dtype=float)
-        feh_grid = self.DEFAULT_FEH_GRID if feh_grid is None else np.asarray(feh_grid, dtype=float)
-        logg_grid = self.DEFAULT_LOGG_GRID if logg_grid is None else np.asarray(logg_grid, dtype=float)
         
+        teff_grid = self.DEFAULT_TEFF_GRID if teff_grid is None else _as_float_array(teff_grid)
+        feh_grid = self.DEFAULT_FEH_GRID if feh_grid is None else _as_float_array(feh_grid)
+        logg_grid = self.DEFAULT_LOGG_GRID if logg_grid is None else _as_float_array(logg_grid)
+         
         if cache_path is not None:
             cache_path = os.path.abspath(os.path.expanduser(cache_path))
             if os.path.exists(cache_path):
@@ -343,25 +407,47 @@ class PhoenixLibrary(object):
                     if self.verbose:
                         print("Cache mismatch, rebuilding:", cache_path)
                         print(str(e))
-                                
-        flux_grid = np.full((len(teff_grid), len(feh_grid), len(logg_grid), len(observed_wave)),
-                            np.nan, dtype=float)    
-        
+
+        # Precompute the PHOENIX support grid in the requested wavelength medium
+        # and its overlap with the observed wavelength grid once, outside the
+        # template loop.                                
+        wave_clip, mask = self._prepare_resampling_grid(
+            observed_wave=observed_wave,
+            observed_wave_medium=observed_wave_medium,
+        )
+
+        flux_grid = np.full(
+            (len(teff_grid), len(feh_grid), len(logg_grid), len(observed_wave)),
+            np.nan,
+            dtype=float,
+        )
+
+        # Fast observed-grid build: read only the template flux array for each
+        # grid point, then resample using the precomputed wavelength support.
         for it, teff in enumerate(teff_grid):
             for iz, feh in enumerate(feh_grid):
                 for ig, logg in enumerate(logg_grid):
                     try:
-                        _, f = self.load_template(
-                            teff, logg, feh,
-                            wave=observed_wave,
-                            wave_medium=observed_wave_medium,
+                        path = self.template_path(teff, logg, feh)
+                        if not os.path.exists(path):
+                            raise FileNotFoundError("PHOENIX template not found: {0}".format(path))
+
+                        f = self._resample_template_fast(
+                            path=path,
+                            wave_clip=wave_clip,
+                            mask=mask,
+                            observed_wave=observed_wave,
                         )
                         flux_grid[it, iz, ig, :] = f
                     except Exception as e:
                         if not allow_missing:
                             raise
                         if self.verbose:
-                            print("Skipping missing template teff={0} feh={1} logg={2}: {3}".format(teff, feh, logg, str(e)))
+                            print(
+                                "Skipping missing template teff={0} feh={1} logg={2}: {3}".format(
+                                    teff, feh, logg, str(e)
+                                )
+                            )
         
         self._flux_grid = flux_grid
         

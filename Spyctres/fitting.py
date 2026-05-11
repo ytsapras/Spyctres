@@ -5,7 +5,7 @@ from scipy.ndimage import gaussian_filter1d
 from numpy.polynomial.legendre import legvander
 
 from .Spyctres import velocity_correction
-from .io import SpectrumSegment
+from .io import SpectrumSegment, SpectrumCollection
 from .phoenix_forward import (
     infer_segments_wave_medium,
     fit_bounds_from_segments,
@@ -17,6 +17,58 @@ from .phoenix_forward import (
 # RV handling: velocity_correction applies a Doppler shift by re-sampling the model spectrum at shifted wavelengths, consistent with the standard approximation Δλ/λ ≈ v/c for small velocities.
 
 C_KMS = 299792.458
+
+
+def _coerce_segments_input(segments):
+    """
+    Normalize supported segment inputs to a list of SpectrumSegment objects
+    plus a matching positive weight vector.
+
+    Supported inputs
+    ----------------
+    - SpectrumSegment
+    - list/tuple of SpectrumSegment
+    - SpectrumCollection
+    """
+    if isinstance(segments, SpectrumCollection):
+        seg_list = list(segments.segments)
+        seg_weights = np.asarray(segments.weights, dtype=float)
+        collection_name = segments.name
+        collection_meta = dict(segments.meta)
+    elif isinstance(segments, SpectrumSegment):
+        seg_list = [segments]
+        seg_weights = np.ones(1, dtype=float)
+        collection_name = None
+        collection_meta = {}
+    elif isinstance(segments, (list, tuple)):
+        seg_list = list(segments)
+        seg_weights = np.ones(len(seg_list), dtype=float)
+        collection_name = None
+        collection_meta = {}
+    else:
+        raise TypeError(
+            "segments must be a SpectrumSegment, SpectrumCollection, or "
+            "list/tuple of SpectrumSegment objects."
+        )
+
+    if len(seg_list) == 0:
+        raise ValueError("No segments were provided for fitting.")
+
+    for i, seg in enumerate(seg_list):
+        if not isinstance(seg, SpectrumSegment):
+            raise TypeError(
+                "All segment inputs must be SpectrumSegment objects; "
+                "got type {0} at index {1}.".format(type(seg).__name__, i)
+            )
+
+    if seg_weights.ndim != 1 or len(seg_weights) != len(seg_list):
+        raise ValueError("Segment weights must be 1D and match the number of segments.")
+    if not np.all(np.isfinite(seg_weights)):
+        raise ValueError("Segment weights must be finite.")
+    if np.any(seg_weights <= 0):
+        raise ValueError("Segment weights must be > 0.")
+
+    return seg_list, seg_weights, collection_name, collection_meta
 
 def _resolve_broadening_fwhm_kms(R=None, fwhm_kms=None):
     """
@@ -175,20 +227,20 @@ def _estimate_sigma(flux):
     return float(sig)
 
 
-def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_mask=None):
+def _build_data_vectors(
+    segments,
+    segment_weights=None,
+    regions=None,
+    exclude_regions=None,
+    exclude_mask=None,
+):
     """
-    Build two synchronized representations of the data:
-
-    1) support-wave representation used to build / evaluate the PHOENIX model
-       on the full wavelength support of each segment;
-    2) fit-point representation used for chi-square evaluation, where only
-       seg.mask-selected pixels (plus optional region / exclusion logic) enter
-       the objective.
+    Build synchronized support-wave and fit-point data vectors.
 
     Returns
     -------
     support_wave_all : ndarray
-        Concatenated full support wavelength grid across segments.
+        Concatenated full support wavelength grid across retained segments.
     flux_fit_all, err_fit_all : ndarray
         Concatenated flux/error vectors for fit pixels only.
     support_slices : list[slice]
@@ -197,28 +249,40 @@ def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_ma
         Per-segment slices into flux_fit_all / err_fit_all.
     fit_masks : list[ndarray(bool)]
         Boolean masks mapping each segment support grid to its fit pixels.
+    fit_weights : ndarray
+        Positive per-segment weights aligned with the retained segment list.
     seg_meta : list[dict]
-        Per-segment metadata.
+        Per-segment metadata for retained segments.
     """
+    if segment_weights is None:
+        segment_weights = np.ones(len(segments), dtype=float)
+    else:
+        segment_weights = np.asarray(segment_weights, dtype=float)
+        if segment_weights.ndim != 1 or len(segment_weights) != len(segments):
+            raise ValueError("segment_weights must be 1D and match the number of segments.")
+
     support_wave_all = []
     flux_fit_all = []
     err_fit_all = []
     support_slices = []
     fit_slices = []
     fit_masks = []
+    fit_weights = []
     seg_meta = []
 
     start_support = 0
     start_fit = 0
 
-    for i, seg in enumerate(segments):
+    for i, (seg, seg_weight) in enumerate(zip(segments, segment_weights)):
         w_full = np.asarray(seg.wave, dtype=float)
         f_full = np.asarray(seg.flux, dtype=float)
 
         support_ok = np.isfinite(w_full) & np.isfinite(f_full)
 
         if seg.err is None:
-            e_full = np.ones_like(f_full) * _estimate_sigma(f_full[support_ok] if np.any(support_ok) else f_full)
+            e_full = np.ones_like(f_full) * _estimate_sigma(
+                f_full[support_ok] if np.any(support_ok) else f_full
+            )
             err_ok = np.isfinite(e_full) & (e_full > 0)
         else:
             e_full = np.asarray(seg.err, dtype=float)
@@ -230,12 +294,12 @@ def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_ma
             reg = regions.get(i, regions.get(seg.name, None))
         else:
             reg = regions
-            
+
         if isinstance(exclude_regions, dict):
             ex = exclude_regions.get(i, exclude_regions.get(seg.name, None))
         else:
             ex = exclude_regions
-               
+
         fit_m = build_effective_fit_mask(
             seg,
             regions=reg,
@@ -243,20 +307,16 @@ def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_ma
             exclude_mask=exclude_mask,
         )
         fit_m &= support_ok
-        
+
         n_support = int(np.sum(support_ok))
         n_fit = int(np.sum(fit_m))
 
-        if n_support == 0:
-            continue
-        if n_fit == 0:
+        if n_support == 0 or n_fit == 0:
             continue
 
         w_support = w_full[support_ok].astype(float)
         f_fit = f_full[fit_m].astype(float)
         e_fit = e_full[fit_m].astype(float)
-
-        fit_mask_on_support = fit_m[support_ok]
 
         support_wave_all.append(w_support)
         flux_fit_all.append(f_fit)
@@ -264,10 +324,13 @@ def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_ma
 
         support_slices.append(slice(start_support, start_support + n_support))
         fit_slices.append(slice(start_fit, start_fit + n_fit))
-        fit_masks.append(fit_mask_on_support)
+        fit_masks.append(fit_m[support_ok])
+        fit_weights.append(float(seg_weight))
 
         seg_meta.append({
             "name": seg.name,
+            "index": int(i),
+            "weight": float(seg_weight),
             "wave_min": float(w_support.min()),
             "wave_max": float(w_support.max()),
             "n_support": n_support,
@@ -280,8 +343,18 @@ def _build_data_vectors(segments, regions=None, exclude_regions=None, exclude_ma
     support_wave_all = np.concatenate(support_wave_all) if support_wave_all else np.array([], dtype=float)
     flux_fit_all = np.concatenate(flux_fit_all) if flux_fit_all else np.array([], dtype=float)
     err_fit_all = np.concatenate(err_fit_all) if err_fit_all else np.array([], dtype=float)
+    fit_weights = np.asarray(fit_weights, dtype=float)
 
-    return support_wave_all, flux_fit_all, err_fit_all, support_slices, fit_slices, fit_masks, seg_meta
+    return (
+        support_wave_all,
+        flux_fit_all,
+        err_fit_all,
+        support_slices,
+        fit_slices,
+        fit_masks,
+        fit_weights,
+        seg_meta,
+    )
     
     
 def _pick_subgrid(full_grid, center, half_width, n_min=3, n_max=None):
@@ -312,13 +385,13 @@ def _pick_subgrid(full_grid, center, half_width, n_min=3, n_max=None):
 
 def _chi2_for_params(
     support_wave_all, flux_all, err_all,
-    support_slices, fit_slices, fit_masks,
+    support_slices, fit_slices, fit_masks, segment_weights,
     teff, feh, logg, rv_tot, phoenix_lib, mdeg,
     decimate=1,
     broadening_fwhm_kms=None,
 ):
     """
-    Compute chi2 with per-segment multiplicative polynomial solved linearly.
+    Compute weighted chi-square with per-segment multiplicative polynomial solved linearly.
     Used for RV initialization.
 
     The model is built on the full support wavelength grid, but chi2 is
@@ -328,7 +401,9 @@ def _chi2_for_params(
     shifted = velocity_correction(np.c_[support_wave_all, model0], rv_tot)[:, 1]
 
     chi2 = 0.0
-    for support_sl, fit_sl, fit_mask in zip(support_slices, fit_slices, fit_masks):
+    for support_sl, fit_sl, fit_mask, seg_weight in zip(
+        support_slices, fit_slices, fit_masks, segment_weights
+    ):
         w_support = support_wave_all[support_sl]
         m_support = _gaussian_broaden_velocity(
             w_support, shifted[support_sl], fwhm_kms=broadening_fwhm_kms
@@ -348,7 +423,7 @@ def _chi2_for_params(
 
         m_corr, _ = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
         r = (f - m_corr) / e
-        chi2 += float(np.sum(r * r))
+        chi2 += float(seg_weight) * float(np.sum(r * r))
 
     return chi2
 
@@ -418,6 +493,7 @@ def _chi2_for_params_native_interp(
     err_all,
     fit_slices,
     fit_masks,
+    segment_weights,
     teff,
     feh,
     logg,
@@ -431,7 +507,7 @@ def _chi2_for_params_native_interp(
     model_margin_A=200.0,
 ):
     """
-    Compute chi2 for the native_interp branch.
+    Compute weighted chi-square for the native_interp branch.
 
     The PHOENIX model is interpolated in parameter space on a dense model-space
     wavelength grid, then shifted, convolved, and resampled to each segment
@@ -453,7 +529,9 @@ def _chi2_for_params_native_interp(
     )
 
     chi2 = 0.0
-    for seg, model_full, fit_sl, fit_mask in zip(forward_segments, model_list, fit_slices, fit_masks):
+    for seg, model_full, fit_sl, fit_mask, seg_weight in zip(
+        forward_segments, model_list, fit_slices, fit_masks, segment_weights
+    ):
         w = np.asarray(seg.wave, dtype=float)[fit_mask]
         f = flux_all[fit_sl]
         e = err_all[fit_sl]
@@ -468,7 +546,7 @@ def _chi2_for_params_native_interp(
 
         m_corr, _ = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
         r = (f - m_corr) / e
-        chi2 += float(np.sum(r * r))
+        chi2 += float(seg_weight) * float(np.sum(r * r))
 
     return chi2
 
@@ -594,6 +672,8 @@ def reconstruct_phoenix_legendre_models_for_segments(
     excluded_masks : list[ndarray(bool)]
         Explicit exclusion masks for plotting diagnostics.
     """
+    segments, _segment_weights, _collection_name, _collection_meta = _coerce_segments_input(segments)
+
     teff = float(fit_result["teff"])
     feh = float(fit_result["feh"])
     logg = float(fit_result["logg"])
@@ -776,8 +856,9 @@ def fit_phoenix_full_spectrum(
 
     Parameters
     ----------
-    segments : list[SpectrumSegment]
-        Input spectrum segments to fit.
+    segments : SpectrumSegment, SpectrumCollection, or sequence of SpectrumSegment
+        Input spectrum segments to fit. A SpectrumCollection may also carry
+        per-segment weights used in the joint objective.
 
     phoenix_lib : PhoenixLibrary
         PHOENIX template library interface from `Spyctres.phoenix`, pointing to
@@ -881,9 +962,9 @@ def fit_phoenix_full_spectrum(
         - `success`, `status`, `message`: optimizer status information
         - `resolution_R`: resolving power used for instrumental broadening, if any
         - `lsf_fwhm_kms`: Gaussian LSF FWHM in km/s, if any
+        - `segment_names`, `segment_weights`, `collection_name`, `collection_meta`
     """
-    if not isinstance(segments, (list, tuple)):
-        segments = [segments]
+    segments, segment_weights, collection_name, collection_meta = _coerce_segments_input(segments)
         
     if forward_model not in ("interp_observed", "native_interp"):
         raise ValueError("forward_model must be 'interp_observed' or 'native_interp'.")
@@ -893,8 +974,21 @@ def fit_phoenix_full_spectrum(
             "forward_model='native_interp' currently supports R-based broadening only."
         )
         
-    support_wave_all, flux_all, err_all, support_slices, fit_slices, fit_masks, seg_meta = _build_data_vectors(
-        segments, regions=regions, exclude_regions=exclude_regions, exclude_mask=exclude_mask
+    (
+        support_wave_all,
+        flux_all,
+        err_all,
+        support_slices,
+        fit_slices,
+        fit_masks,
+        fit_weights,
+        seg_meta,
+    ) = _build_data_vectors(
+        segments,
+        segment_weights=segment_weights,
+        regions=regions,
+        exclude_regions=exclude_regions,
+        exclude_mask=exclude_mask,
     )
     if support_wave_all.size == 0 or flux_all.size == 0:
         raise ValueError("No data points selected for fitting.")
@@ -1012,7 +1106,9 @@ def fit_phoenix_full_spectrum(
             spec = np.c_[support_wave_all, model0]
             shifted = velocity_correction(spec, rv_tot)[:, 1]
 
-            for support_sl, fit_sl, fit_mask, meta in zip(support_slices, fit_slices, fit_masks, seg_meta):
+            for support_sl, fit_sl, fit_mask, seg_weight in zip(
+                support_slices, fit_slices, fit_masks, fit_weights
+            ):
                 w_support = support_wave_all[support_sl]
                 m_support = _gaussian_broaden_velocity(
                     w_support, shifted[support_sl], fwhm_kms=broadening_fwhm_kms
@@ -1024,7 +1120,7 @@ def fit_phoenix_full_spectrum(
                 m = m_support[fit_mask]
 
                 m_corr, coeffs = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
-                out[fit_sl] = (f - m_corr) / e
+                out[fit_sl] = np.sqrt(float(seg_weight)) * (f - m_corr) / e
         else:
             model_list = build_phoenix_native_models_for_segments(
                 segments=forward_segments,
@@ -1039,7 +1135,9 @@ def fit_phoenix_full_spectrum(
                 extrapolate=True,
             )
 
-            for seg, model_full, fit_sl, fit_mask in zip(forward_segments, model_list, fit_slices, fit_masks):
+            for seg, model_full, fit_sl, fit_mask, seg_weight in zip(
+                forward_segments, model_list, fit_slices, fit_masks, fit_weights
+            ):
                 w_support = np.asarray(seg.wave, dtype=float)
 
                 w = w_support[fit_mask]
@@ -1048,7 +1146,7 @@ def fit_phoenix_full_spectrum(
                 m = np.asarray(model_full, dtype=float)[fit_mask]
 
                 m_corr, coeffs = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
-                out[fit_sl] = (f - m_corr) / e
+                out[fit_sl] = np.sqrt(float(seg_weight)) * (f - m_corr) / e
 
         return out
     
@@ -1061,9 +1159,16 @@ def fit_phoenix_full_spectrum(
         for j, rv in enumerate(rv_grid):
             if forward_model == "interp_observed":
                 chi2s[j] = _chi2_for_params(
-                    support_wave_all, flux_all, err_all,
-                    support_slices, fit_slices, fit_masks,
-                    teff0, feh0, logg0,
+                    support_wave_all,
+                    flux_all,
+                    err_all,
+                    support_slices,
+                    fit_slices,
+                    fit_masks,
+                    fit_weights,
+                    teff0,
+                    feh0,
+                    logg0,
                     rv_bary_kms + float(rv),
                     phoenix_lib,
                     mdeg=mdeg,
@@ -1077,6 +1182,7 @@ def fit_phoenix_full_spectrum(
                     err_all=err_all,
                     fit_slices=fit_slices,
                     fit_masks=fit_masks,
+                    segment_weights=fit_weights,
                     teff=teff0,
                     feh=feh0,
                     logg=logg0,
@@ -1111,7 +1217,8 @@ def fit_phoenix_full_spectrum(
         verbose=2 if verbose else 0,
     )
 
-    # Compute diagnostics
+    # Compute diagnostics. If segment weights are used, chi2 is the weighted
+    # sum of squared normalized residuals.
     r = res.fun
     chi2 = float(np.sum(r * r))
     n = int(r.size)
@@ -1139,6 +1246,11 @@ def fit_phoenix_full_spectrum(
         "seg_meta": seg_meta,
         "forward_model": str(forward_model),
         "model_margin_A": float(model_margin_A),
+        "n_segments": int(len(seg_meta)),
+        "segment_names": [m.get("name") for m in seg_meta],
+        "segment_weights": [float(w) for w in fit_weights],
+        "collection_name": collection_name,
+        "collection_meta": collection_meta,
         "resolution_R": None if R is None else float(R),
         "lsf_fwhm_kms": None if broadening_fwhm_kms is None else float(broadening_fwhm_kms),
         # Note: did not store poly coeffs in this minimal version to avoid re-evaluating.
