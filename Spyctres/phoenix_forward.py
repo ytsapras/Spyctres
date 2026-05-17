@@ -3,9 +3,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
 
-from .waveutils import convert_wavelength_medium
-
-C_KMS = 299792.458
+from .waveutils import convert_wavelength_medium, C_KMS
 
 def _coerce_segment_list(segments):
     """

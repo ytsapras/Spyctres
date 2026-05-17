@@ -22,7 +22,6 @@ from scipy.optimize import least_squares
 from .io import SpectrumSegment
 from .waveutils import convert_wavelength_medium
 from .fitting import (
-    C_KMS,
     build_effective_fit_mask,
     build_excluded_mask,
     reconstruct_phoenix_legendre_models_for_segments,

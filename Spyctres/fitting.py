@@ -24,7 +24,7 @@ from .phoenix_forward import (
 # positive RV redshifts the template/model. Observed-grid PHOENIX paths must
 # call _apply_observed_grid_rv_shift(), not velocity_correction() directly.
 
-C_KMS = 299792.458
+from .waveutils import C_KMS
 
 
 def _coerce_segments_input(segments):
