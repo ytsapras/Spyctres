@@ -21,13 +21,15 @@ from scipy.optimize import least_squares
 
 from .io import SpectrumSegment
 from .waveutils import convert_wavelength_medium
-from .Spyctres import velocity_correction
 from .fitting import (
+    C_KMS,
     build_effective_fit_mask,
     build_excluded_mask,
     reconstruct_phoenix_legendre_models_for_segments,
     _resolve_broadening_fwhm_kms,
+    _resolve_segment_fwhm_kms,
     _gaussian_broaden_velocity,
+    _apply_observed_grid_rv_shift,
 )
 from .phoenix_forward import (
     build_phoenix_native_models_for_segments,
@@ -37,9 +39,10 @@ from .phoenix_forward import (
 )
 
 BALMER_CENTERS_VAC = {
-    "Hδ": 4101.74,
-    "Hγ": 4340.47,
+    "Hα": 6562.80,
     "Hβ": 4861.33,
+    "Hγ": 4340.47,
+    "Hδ": 4101.74,
 }
 
 XSHOOTER_BALMER_WINDOWS = {
@@ -61,6 +64,24 @@ XSHOOTER_NOTEBOOK_CONT_WINDOWS = {
     "Hβ": ((-120.0, -40.0), (40.0, 120.0)),
 }
 
+XSHOOTER_BALMER_CORE_MASK_DEFAULT_A = 10.0
+XSHOOTER_BALMER_CORE_MASK_CONSERVATIVE_A = 12.0
+
+BALMER_LABEL_ALIASES = {
+    "hα": "Hα",
+    "halpha": "Hα",
+    "ha": "Hα",
+    "hβ": "Hβ",
+    "hbeta": "Hβ",
+    "hb": "Hβ",
+    "hγ": "Hγ",
+    "hgamma": "Hγ",
+    "hg": "Hγ",
+    "hδ": "Hδ",
+    "hdelta": "Hδ",
+    "hd": "Hδ",
+}
+
 
 def xshooter_balmer_windows(window_mode="notebook"):
     """
@@ -74,6 +95,7 @@ def xshooter_balmer_windows(window_mode="notebook"):
     Returns
     -------
     list of (label, wmin, wmax)
+        A fresh list of preset UVB Balmer windows.
     """
     mode = str(window_mode).strip().lower()
     if mode not in XSHOOTER_BALMER_WINDOWS:
@@ -81,20 +103,50 @@ def xshooter_balmer_windows(window_mode="notebook"):
     return list(XSHOOTER_BALMER_WINDOWS[mode])
 
 
+def _canonical_balmer_label(label):
+    """
+    Normalize common ASCII and Unicode Balmer-line aliases to a canonical label.
+
+    Examples
+    --------
+    Halpha -> Hα
+    Hbeta  -> Hβ
+    Hgamma -> Hγ
+    Hdelta -> Hδ
+    """
+    raw = str(label).strip()
+    key = raw.lower().replace("_", "").replace("-", "").replace(" ", "")
+    return BALMER_LABEL_ALIASES.get(key, raw)
+
+
+def _canonicalize_balmer_dict_keys(d):
+    """
+    Return a copy of a dict whose keys are Balmer-line labels normalized to
+    the canonical internal form.
+    """
+    if d is None:
+        return {}
+    return {_canonical_balmer_label(k): v for k, v in d.items()}
+
+
 def attach_balmer_metadata(segments, cont_windows=None, centers_vac=None):
     """
-    Attach Balmer line metadata to window segments in-place.
+    Attach Balmer-line metadata to segments in-place.
 
-    This expects segment names like 'Hδ', 'Hγ', 'Hβ'. For each segment, it stores:
-    - line_label
-    - line_center_vac
-    - line_center_data
-    - cont_windows
+    This helper accepts both canonical Unicode labels such as 'Hβ', 'Hγ', and
+    common ASCII aliases such as 'Hbeta', 'Hgamma', 'Hdelta', 'Halpha'.
+
+    For each segment it stores:
+    - line_label       : canonical internal label
+    - line_label_input : original input label
+    - line_center_vac  : vacuum line center
+    - line_center_data : line center converted into the segment wavelength medium
+    - cont_windows     : continuum sideband windows, if available
 
     Parameters
     ----------
     segments : list[SpectrumSegment]
-        Input Balmer-window segments.
+        Input line-window segments.
     cont_windows : dict, optional
         Mapping from line label to continuum sideband windows.
         Defaults to XSHOOTER_NOTEBOOK_CONT_WINDOWS.
@@ -112,14 +164,21 @@ def attach_balmer_metadata(segments, cont_windows=None, centers_vac=None):
     if centers_vac is None:
         centers_vac = BALMER_CENTERS_VAC
 
+    cont_windows = _canonicalize_balmer_dict_keys(cont_windows)
+    centers_vac = _canonicalize_balmer_dict_keys(centers_vac)
+
     for seg in segments:
-        label = str(seg.name)
+        raw_label = str(seg.name)
+        label = _canonical_balmer_label(raw_label)
+
         if label not in centers_vac:
             raise ValueError(
-                "Segment name {0!r} not recognized as a supported Balmer label.".format(label)
+                "Segment name {0!r} not recognized as a supported Balmer label.".format(raw_label)
             )
 
         center_vac = float(centers_vac[label])
+
+        seg.meta["line_label_input"] = raw_label
         seg.meta["line_label"] = label
         seg.meta["line_center_vac"] = center_vac
 
@@ -136,7 +195,11 @@ def attach_balmer_metadata(segments, cont_windows=None, centers_vac=None):
             center_data = center_vac
 
         seg.meta["line_center_data"] = center_data
-        seg.meta["cont_windows"] = cont_windows[label]
+
+        if label in cont_windows:
+            seg.meta["cont_windows"] = cont_windows[label]
+        else:
+            seg.meta.pop("cont_windows", None)
 
     return segments
 
@@ -156,10 +219,7 @@ def ensure_phoenix_interpolator_for_segments(
     support_wave_all = np.concatenate([np.asarray(seg.wave, dtype=float) for seg in segments])
 
     segment_media = sorted(set(str(seg.wave_medium).lower() for seg in segments))
-    if len(segment_media) == 1:
-        observed_wave_medium = segment_media[0]
-    else:
-        observed_wave_medium = None
+    observed_wave_medium = segment_media[0] if len(segment_media) == 1 else None
 
     need_rebuild = False
     if phoenix_lib.wave is None:
@@ -227,7 +287,7 @@ def _build_native_interp_wave_grid_for_segments(segments, phoenix_lib, model_mar
 
 def _build_sideband_mask(seg, wave, fit_mask, sideband_width=10.0):
     """
-    Build sideband mask for one segment.
+    Build a sideband mask for one segment.
 
     If seg.meta['cont_windows'] is present, use those explicit sidebands
     relative to seg.meta['line_center_data']. Otherwise fall back to
@@ -421,7 +481,7 @@ def _solve_sideband_multiplicative_poly(wave, flux, err, model, used_mask, order
 
     This mirrors the notebook logic:
         flux ~ model * poly(w)
-    on the used wing pixels.
+    on the used pixels.
     """
     wave = np.asarray(wave, dtype=float)
     flux = np.asarray(flux, dtype=float)
@@ -465,18 +525,33 @@ def _solve_sideband_multiplicative_poly(wave, flux, err, model, used_mask, order
     return model * poly_all, coeffs
 
 
-def make_balmer_core_exclude_mask(core_halfwidth=3.0, wave_medium="vacuum"):
+def make_balmer_core_exclude_mask(
+    core_halfwidth=XSHOOTER_BALMER_CORE_MASK_DEFAULT_A,
+    wave_medium="vacuum",
+):
     """
-    Build a boolean exclusion mask callable for the Balmer line cores.
+    Build a boolean exclusion-mask callable for the UVB Balmer line cores.
+
+    This helper currently targets the three Balmer lines used by the X-SHOOTER
+    UVB recipes: Hδ, Hγ, and Hβ.
 
     Parameters
     ----------
     core_halfwidth : float
-        Half-width in Angstrom around each Balmer line center to exclude.
+        Half-width in Angstrom around each line center to exclude.
+        For X-SHOOTER UVB Balmer-wing classification, the 
+        default value is 10 Angstrom. Use 6–12 Angstroms as a robustness range.
     wave_medium : {"air", "vacuum", "unknown"}
         Wavelength medium of the observed data.
     """
-    centers_vac = np.array([4101.74, 4340.47, 4861.33], dtype=float)
+    centers_vac = np.array(
+        [
+            BALMER_CENTERS_VAC["Hδ"],
+            BALMER_CENTERS_VAC["Hγ"],
+            BALMER_CENTERS_VAC["Hβ"],
+        ],
+        dtype=float,
+    )
 
     wave_medium = str(wave_medium).lower()
     if wave_medium in ("air", "vacuum"):
@@ -521,21 +596,57 @@ def fit_phoenix_sideband_symmetric(
     bounds=None,
 ):
     """
-    Sideband-normalized fitter for Balmer-window workflows.
+    Sideband-normalized fitter for line-window workflows.
 
-    Data are already sideband-normalized segment-by-segment, the model is
+    Data are sideband-normalized segment-by-segment, the model is
     sideband-normalized the same way, and a low-order multiplicative polynomial
-    is then solved on the used wing pixels before residuals are computed.
+    is then solved on the used pixels before residuals are computed.
 
     The wavelength-space forward model can follow either:
-    - forward_model="interp_observed": interpolate directly on the segment support
-      grid, then shift and broaden there.
-    - forward_model="native_interp": interpolate on a dense model-space wavelength
-      grid, then shift, convolve, and resample last.
+    - forward_model="interp_observed": interpolate directly on the segment
+      support grid, then apply the PHOENIX RV convention and broaden there.
+      This is retained as a fast/legacy compatibility path.
+    - forward_model="native_interp": interpolate on a dense model-space
+      wavelength grid, then shift, convolve, and resample last. This is the
+      recommended path for line-profile work.
+      
+    RV convention
+    -------------
+    The returned `rv_kms` follows the PHOENIX fitting convention used by
+    Spyctres.fitting: positive RV redshifts the template/model. The observed-grid
+    branch uses `_apply_observed_grid_rv_shift()` internally to preserve this
+    convention while leaving the legacy Spyctres.velocity_correction API unchanged.
     """
-    if not isinstance(segments, (list, tuple)):
+    if isinstance(segments, SpectrumSegment):
         segments = [segments]
+    else:
+        segments = list(segments)
 
+    for seg in segments:
+        if seg.err is None:
+            raise ValueError(
+                "fit_phoenix_sideband_symmetric requires seg.err for all segments. "
+                "Provide uncertainties or use fit_phoenix_full_spectrum(), which "
+                "can estimate fallback errors."
+            )
+
+    teff0, feh0, logg0, rv0 = map(float, p0)
+    
+    if teff_grid is None:
+        teff_grid_req = phoenix_lib.DEFAULT_TEFF_GRID
+    else:
+        teff_grid_req = np.asarray(teff_grid, dtype=float)
+
+    if feh_grid is None:
+        feh_grid_req = phoenix_lib.DEFAULT_FEH_GRID
+    else:
+        feh_grid_req = np.asarray(feh_grid, dtype=float)
+
+    if logg_grid is None:
+        logg_grid_req = phoenix_lib.DEFAULT_LOGG_GRID
+    else:
+        logg_grid_req = np.asarray(logg_grid, dtype=float)
+                    
     if forward_model not in ("interp_observed", "native_interp"):
         raise ValueError("forward_model must be 'interp_observed' or 'native_interp'.")
 
@@ -547,24 +658,19 @@ def fit_phoenix_sideband_symmetric(
         raise ValueError("No usable points remain after masking.")
 
     support_lengths = [len(seg.wave) for seg in segments]
-
+    segment_fwhm_kms = [
+        _resolve_segment_fwhm_kms(seg, R=R, fwhm_kms=None)
+        for seg in segments
+    ]
     if forward_model == "interp_observed":
         support_wave_all = ensure_phoenix_interpolator_for_segments(
             segments=segments,
             phoenix_lib=phoenix_lib,
-            teff_grid=teff_grid,
-            feh_grid=feh_grid,
-            logg_grid=logg_grid,
+            teff_grid=teff_grid_req,
+            feh_grid=feh_grid_req,
+            logg_grid=logg_grid_req,
             cache_path=cache_path,
         )
-        model_wave_grid = support_wave_all
-
-        segment_media = sorted(set(str(seg.wave_medium).lower() for seg in segments))
-        if len(segment_media) == 1:
-            model_wave_medium = segment_media[0]
-        else:
-            model_wave_medium = None
-
     else:
         model_wave_grid, model_wave_medium = _build_native_interp_wave_grid_for_segments(
             segments=segments,
@@ -584,21 +690,21 @@ def fit_phoenix_sideband_symmetric(
         else:
             tg, zg, gg = phoenix_lib._grid
             if (
-                (len(tg) != len(teff_grid)) or
-                (len(zg) != len(feh_grid)) or
-                (len(gg) != len(logg_grid)) or
-                (not np.allclose(tg, np.asarray(teff_grid, dtype=float), rtol=0.0, atol=0.0)) or
-                (not np.allclose(zg, np.asarray(feh_grid, dtype=float), rtol=0.0, atol=0.0)) or
-                (not np.allclose(gg, np.asarray(logg_grid, dtype=float), rtol=0.0, atol=0.0))
+                (len(tg) != len(teff_grid_req)) or
+                (len(zg) != len(feh_grid_req)) or
+                (len(gg) != len(logg_grid_req)) or
+                (not np.allclose(tg, teff_grid_req, rtol=0.0, atol=0.0)) or
+                (not np.allclose(zg, feh_grid_req, rtol=0.0, atol=0.0)) or
+                (not np.allclose(gg, logg_grid_req, rtol=0.0, atol=0.0))
             ):
                 need_rebuild = True
 
         if need_rebuild:
             phoenix_lib.build_interpolator(
                 observed_wave=model_wave_grid,
-                teff_grid=np.asarray(teff_grid, dtype=float),
-                feh_grid=np.asarray(feh_grid, dtype=float),
-                logg_grid=np.asarray(logg_grid, dtype=float),
+                teff_grid=teff_grid_req,
+                feh_grid=feh_grid_req,
+                logg_grid=logg_grid_req,
                 cache_path=cache_path,
                 observed_wave_medium=model_wave_medium,
             )
@@ -628,10 +734,16 @@ def fit_phoenix_sideband_symmetric(
             if len(model0) != len(support_wave_all):
                 return np.ones(n_points, dtype=float) * 1e6
 
-            shifted_all = velocity_correction(np.c_[support_wave_all, model0], rv_tot)[:, 1]
-
+            shifted_all = _apply_observed_grid_rv_shift(
+                support_wave_all,
+                model0,
+                rv_tot,
+            )
+            
             i0 = 0
-            for seg, used_mask, n_support in zip(segments, used_masks, support_lengths):
+            for seg, used_mask, n_support, seg_fwhm in zip(
+                segments, used_masks, support_lengths, segment_fwhm_kms
+            ):
                 i1 = i0 + n_support
 
                 wave = np.asarray(seg.wave, dtype=float)
@@ -640,9 +752,10 @@ def fit_phoenix_sideband_symmetric(
 
                 model_full = shifted_all[i0:i1]
                 model_full = _gaussian_broaden_velocity(
-                    wave, model_full, fwhm_kms=broadening_fwhm_kms
+                    wave,
+                    model_full,
+                    fwhm_kms=seg_fwhm,
                 )
-
                 model_norm, _ = normalize_model_sidebands(
                     seg,
                     model_full,
@@ -669,13 +782,12 @@ def fit_phoenix_sideband_symmetric(
                 template_flux_native=model0,
                 rv_kms=rv_kms,
                 rv_bary_kms=rv_bary_kms,
-                R=R,
+                segment_fwhm_kms=segment_fwhm_kms,
                 phoenix_wave_medium=model_wave_medium,
                 model_margin_A=model_margin_A,
                 bounds_use_fit_mask=True,
                 extrapolate=True,
             )
-
             for seg, used_mask, model_full in zip(segments, used_masks, model_list):
                 wave = np.asarray(seg.wave, dtype=float)
                 flux = np.asarray(seg.flux, dtype=float)
@@ -700,9 +812,7 @@ def fit_phoenix_sideband_symmetric(
                 out.append((flux[used_mask] - model_corr[used_mask]) / err[used_mask])
 
         return np.concatenate(out)
-
-    teff0, feh0, logg0, rv0 = map(float, p0)
-
+    
     if rv_init == "grid":
         rv_lo, rv_hi = float(bounds[0][3]), float(bounds[1][3])
         rv_grid = np.linspace(rv_lo, rv_hi, int(rv_grid_n))
@@ -710,12 +820,14 @@ def fit_phoenix_sideband_symmetric(
             [np.sum(residuals((teff0, feh0, logg0, float(rv))) ** 2) for rv in rv_grid],
             dtype=float,
         )
-        rv0_best = float(rv_grid[int(np.argmin(chi2s))])
+        rv0_use = float(rv_grid[np.argmin(chi2s)])
         if verbose:
-            print("RV init grid best:", rv0_best)
-        p0_use = (teff0, feh0, logg0, rv0_best)
-    else:
+            print("RV init grid best:", rv0_use)
+        p0_use = (teff0, feh0, logg0, rv0_use)
+    elif rv_init is None:
         p0_use = (teff0, feh0, logg0, rv0)
+    else:
+        raise ValueError("rv_init must be 'grid' or None.")
 
     res = least_squares(
         residuals,
@@ -751,6 +863,12 @@ def fit_phoenix_sideband_symmetric(
         "nfev": int(res.nfev),
         "forward_model": str(forward_model),
         "model_margin_A": float(model_margin_A),
+        "segment_lsf_fwhm_kms": [
+            None if x is None else float(x) for x in segment_fwhm_kms
+        ],
+        "segment_resolution_R_effective": [
+            None if x is None else float(C_KMS / x) for x in segment_fwhm_kms
+        ],
         "resolution_R": None if R is None else float(R),
         "lsf_fwhm_kms": None if broadening_fwhm_kms is None else float(broadening_fwhm_kms),
     }
@@ -774,6 +892,13 @@ def build_plot_models_for_segments(
 ):
     """
     Reconstruct per-segment fitted model arrays on the full pixel grid of each segment.
+
+    Parameters
+    ----------
+    norm_mode : {"poly", "sideband"}
+        Reconstruction path. "poly" delegates to the generic fitter-side
+        polynomial reconstruction. "sideband" rebuilds the sideband-normalized
+        model and the local multiplicative polynomial used by the recipe fitter.
     """
     teff = float(fit_result["teff"])
     feh = float(fit_result["feh"])
@@ -810,7 +935,10 @@ def build_plot_models_for_segments(
         build_excluded_mask(seg, exclude_mask=exclude_mask)
         for seg in segments
     ]
-
+    segment_fwhm_kms = [
+        _resolve_segment_fwhm_kms(seg, R=R, fwhm_kms=fwhm_kms)
+        for seg in segments
+    ]
     model_full_list = []
     coeffs_list = []
 
@@ -825,10 +953,8 @@ def build_plot_models_for_segments(
                 "{0} vs {1}".format(len(model_support_all), n_support_total)
             )
 
-        broadening_fwhm_kms = _resolve_broadening_fwhm_kms(R=R, fwhm_kms=fwhm_kms)
-
         i0 = 0
-        for seg, used_mask in zip(segments, used_masks):
+        for seg, used_mask, seg_fwhm in zip(segments, used_masks, segment_fwhm_kms):
             wave_full = np.asarray(seg.wave, dtype=float)
             flux_full = np.asarray(seg.flux, dtype=float)
             err_full = np.asarray(seg.err, dtype=float)
@@ -838,13 +964,17 @@ def build_plot_models_for_segments(
 
             model0_full = model_support_all[i0:i1]
 
-            spec = np.c_[wave_full, model0_full]
-            shifted_full = velocity_correction(spec, rv_bary_kms + rv_kms)[:, 1]
-            model_broad_full = _gaussian_broaden_velocity(
-                wave_full, shifted_full, fwhm_kms=broadening_fwhm_kms
+            shifted_full = _apply_observed_grid_rv_shift(
+                wave_full,
+                model0_full,
+                rv_bary_kms + rv_kms,
             )
-
-            model_norm_full, _norm_info = normalize_model_sidebands(
+            model_broad_full = _gaussian_broaden_velocity(
+                wave_full,
+                shifted_full,
+                fwhm_kms=seg_fwhm,
+            )
+            model_norm_full, _ = normalize_model_sidebands(
                 seg,
                 model_broad_full,
                 sideband_width=sideband_width,
@@ -878,19 +1008,18 @@ def build_plot_models_for_segments(
             template_flux_native=model_dense,
             rv_kms=rv_kms,
             rv_bary_kms=rv_bary_kms,
-            R=R,
+            segment_fwhm_kms=segment_fwhm_kms,
             phoenix_wave_medium=model_wave_medium,
             model_margin_A=model_margin_A,
             bounds_use_fit_mask=True,
             extrapolate=True,
         )
-
         for seg, used_mask, model_broad_full in zip(segments, used_masks, model_raw_list):
             wave_full = np.asarray(seg.wave, dtype=float)
             flux_full = np.asarray(seg.flux, dtype=float)
             err_full = np.asarray(seg.err, dtype=float)
 
-            model_norm_full, _norm_info = normalize_model_sidebands(
+            model_norm_full, _ = normalize_model_sidebands(
                 seg,
                 model_broad_full,
                 sideband_width=sideband_width,
@@ -918,6 +1047,8 @@ __all__ = [
     "BALMER_CENTERS_VAC",
     "XSHOOTER_BALMER_WINDOWS",
     "XSHOOTER_NOTEBOOK_CONT_WINDOWS",
+    "XSHOOTER_BALMER_CORE_MASK_DEFAULT_A",
+    "XSHOOTER_BALMER_CORE_MASK_CONSERVATIVE_A",
     "xshooter_balmer_windows",
     "attach_balmer_metadata",
     "normalize_segment_sidebands",

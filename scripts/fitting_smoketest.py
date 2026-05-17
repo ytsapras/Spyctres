@@ -18,8 +18,8 @@ from Spyctres.fitting import (
     fit_phoenix_full_spectrum,
     _solve_multiplicative_legendre,
     _gaussian_broaden_velocity,
+    _apply_observed_grid_rv_shift,
 )
-from Spyctres.Spyctres import velocity_correction
 from Spyctres.config import load_user_config, get_config_value, resolve_setting
 
 def build_parser():
@@ -48,7 +48,7 @@ def build_parser():
 
 def chi2_red_with_poly(lib, wave, flux_n, err, teff, feh, logg, rv, fwhm_kms, mdeg=2):
     m0 = lib.evaluate(teff, feh, logg)
-    sh = velocity_correction(np.c_[wave, m0], rv)[:, 1]
+    sh = _apply_observed_grid_rv_shift(wave, m0, rv)
     sh = _gaussian_broaden_velocity(wave, sh, fwhm_kms=fwhm_kms)
     m_corr, coeffs = _solve_multiplicative_legendre(wave, flux_n, err, sh, mdeg=mdeg)
     r = (flux_n - m_corr) / err
@@ -178,7 +178,7 @@ def main():
 
     # Generate synthetic data using the same shift operator used in fitting
     model0 = lib.evaluate(truth["teff"], truth["feh"], truth["logg"])
-    shifted = velocity_correction(np.c_[wave, model0], truth["rv"])[:, 1]
+    shifted = _apply_observed_grid_rv_shift(wave, model0, truth["rv"])
     shifted = _gaussian_broaden_velocity(wave, shifted, fwhm_kms=fwhm_test)
 
     # Mild multiplicative continuum tilt
@@ -209,8 +209,8 @@ def main():
 
     # RV shift sanity check
     m0 = lib.evaluate(truth["teff"], truth["feh"], truth["logg"])
-    sh0 = velocity_correction(np.c_[wave, m0], 0.0)[:, 1]
-    sh1 = velocity_correction(np.c_[wave, m0], truth["rv"])[:, 1]
+    sh0 = _apply_observed_grid_rv_shift(wave, m0, 0.0)
+    sh1 = _apply_observed_grid_rv_shift(wave, m0, truth["rv"])
     print("RV effect (max |Δ| / median):", float(np.max(np.abs(sh1 - sh0)) / np.median(np.abs(sh0))))
 
     # Fit

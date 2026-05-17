@@ -4,6 +4,10 @@ from scipy.optimize import least_squares
 from scipy.ndimage import gaussian_filter1d
 from numpy.polynomial.legendre import legvander
 
+# Legacy helper. Do not call directly inside PHOENIX fitting paths.
+# PHOENIX fitters use _apply_observed_grid_rv_shift() below so that
+# reported rv_kms follows the standard astronomical convention:
+# positive RV redshifts the template.
 from .Spyctres import velocity_correction
 from .io import SpectrumSegment, SpectrumCollection
 from .phoenix_forward import (
@@ -14,7 +18,11 @@ from .phoenix_forward import (
 )
 # Why multiplicative polynomial: it is a standard way to absorb low-frequency continuum differences and calibration mismatches during full-spectrum fitting.
 
-# RV handling: velocity_correction applies a Doppler shift by re-sampling the model spectrum at shifted wavelengths, consistent with the standard approximation Δλ/λ ≈ v/c for small velocities.
+# RV handling:
+# Spyctres.velocity_correction is a legacy helper and is left unchanged.
+# PHOENIX fitting paths report rv_kms in the standard astronomical convention:
+# positive RV redshifts the template/model. Observed-grid PHOENIX paths must
+# call _apply_observed_grid_rv_shift(), not velocity_correction() directly.
 
 C_KMS = 299792.458
 
@@ -70,6 +78,7 @@ def _coerce_segments_input(segments):
 
     return seg_list, seg_weights, collection_name, collection_meta
 
+
 def _resolve_broadening_fwhm_kms(R=None, fwhm_kms=None):
     """
     Resolve the effective Gaussian FWHM in km/s.
@@ -93,6 +102,43 @@ def _resolve_broadening_fwhm_kms(R=None, fwhm_kms=None):
     return C_KMS / R
 
 
+def _resolve_segment_fwhm_kms(seg, R=None, fwhm_kms=None):
+    """
+    Resolve the Gaussian LSF FWHM in km/s for one segment.
+
+    Precedence:
+    1. seg.meta["lsf_fwhm_kms"]
+    2. seg.meta["fwhm_kms"]
+    3. seg.meta["resolution_R"]
+    4. global fwhm_kms
+    5. global R
+    6. None
+    """
+    meta = getattr(seg, "meta", {}) or {}
+
+    for key in ("lsf_fwhm_kms", "fwhm_kms"):
+        val = meta.get(key, None)
+        if val is None:
+            continue
+        val = float(val)
+        if val <= 0:
+            raise ValueError(
+                "{0} must be > 0 for segment {1}".format(key, getattr(seg, "name", None))
+            )
+        return val
+
+    val = meta.get("resolution_R", None)
+    if val is not None:
+        val = float(val)
+        if val <= 0:
+            raise ValueError(
+                "resolution_R must be > 0 for segment {0}".format(getattr(seg, "name", None))
+            )
+        return C_KMS / val
+
+    return _resolve_broadening_fwhm_kms(R=R, fwhm_kms=fwhm_kms)
+    
+    
 def _gaussian_broaden_velocity(wave, flux, fwhm_kms=None):
     """
     Convolve a spectrum with a Gaussian LSF of constant FWHM in velocity space.
@@ -383,12 +429,36 @@ def _pick_subgrid(full_grid, center, half_width, n_min=3, n_max=None):
     return np.sort(sub)
 
 
+def _apply_observed_grid_rv_shift(wave, model_flux, rv_kms):
+    """
+    Apply RV to a model already sampled on the observed wavelength grid.
+
+    PHOENIX fitter convention
+    -------------------------
+    The PHOENIX fitting API reports rv_kms using the standard astronomical
+    convention:
+
+        positive RV => redshifted template/model features
+        lambda_observed = lambda_rest * (1 + RV / c)
+
+    Legacy compatibility
+    --------------------
+    Spyctres.velocity_correction is part of the legacy public API and is left
+    unchanged. In this observed-grid template-resampling use case,
+    velocity_correction(+RV) shifts absorption features blueward. Therefore the
+    PHOENIX observed-grid branch calls it with -RV to preserve the standard
+    PHOENIX rv_kms convention without changing legacy Spyctres behavior.
+    """
+    spec = np.c_[np.asarray(wave, dtype=float), np.asarray(model_flux, dtype=float)]
+    return velocity_correction(spec, -float(rv_kms))[:, 1]
+    
+    
 def _chi2_for_params(
     support_wave_all, flux_all, err_all,
     support_slices, fit_slices, fit_masks, segment_weights,
     teff, feh, logg, rv_tot, phoenix_lib, mdeg,
     decimate=1,
-    broadening_fwhm_kms=None,
+    segment_fwhm_kms=None,
 ):
     """
     Compute weighted chi-square with per-segment multiplicative polynomial solved linearly.
@@ -398,15 +468,20 @@ def _chi2_for_params(
     evaluated only on the fit pixels inside each segment.
     """
     model0 = phoenix_lib.evaluate(teff, feh, logg)
-    shifted = velocity_correction(np.c_[support_wave_all, model0], rv_tot)[:, 1]
-
+    shifted = _apply_observed_grid_rv_shift(support_wave_all, model0, rv_tot)
     chi2 = 0.0
-    for support_sl, fit_sl, fit_mask, seg_weight in zip(
-        support_slices, fit_slices, fit_masks, segment_weights
+    
+    if segment_fwhm_kms is None:
+        segment_fwhm_kms = [None] * len(support_slices)
+        
+    for support_sl, fit_sl, fit_mask, seg_weight, seg_fwhm in zip(
+        support_slices, fit_slices, fit_masks, segment_weights, segment_fwhm_kms
     ):
         w_support = support_wave_all[support_sl]
         m_support = _gaussian_broaden_velocity(
-            w_support, shifted[support_sl], fwhm_kms=broadening_fwhm_kms
+            w_support,
+            shifted[support_sl],
+            fwhm_kms=seg_fwhm,
         )
 
         w = w_support[fit_mask]
@@ -424,7 +499,7 @@ def _chi2_for_params(
         m_corr, _ = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
         r = (f - m_corr) / e
         chi2 += float(seg_weight) * float(np.sum(r * r))
-
+    
     return chi2
 
 
@@ -503,7 +578,7 @@ def _chi2_for_params_native_interp(
     model_wave_medium,
     mdeg,
     decimate=1,
-    R=None,
+    segment_fwhm_kms=None,
     model_margin_A=200.0,
 ):
     """
@@ -521,7 +596,7 @@ def _chi2_for_params_native_interp(
         template_flux_native=model_dense,
         rv_kms=rv_tot,
         rv_bary_kms=0.0,
-        R=R,
+        segment_fwhm_kms=segment_fwhm_kms,
         phoenix_wave_medium=model_wave_medium,
         model_margin_A=model_margin_A,
         bounds_use_fit_mask=True,
@@ -686,7 +761,10 @@ def reconstruct_phoenix_legendre_models_for_segments(
 
     used_masks = [build_effective_fit_mask(seg, exclude_mask=exclude_mask) for seg in segments]
     excluded_masks = [build_excluded_mask(seg, exclude_mask=exclude_mask) for seg in segments]
-
+    segment_fwhm_kms = [
+        _resolve_segment_fwhm_kms(seg, R=R, fwhm_kms=fwhm_kms)
+        for seg in segments
+    ]
     model_full_list = []
     coeffs_list = []
 
@@ -701,10 +779,8 @@ def reconstruct_phoenix_legendre_models_for_segments(
                 "{0} vs {1}".format(len(model_support_all), n_support_total)
             )
 
-        broadening_fwhm_kms = _resolve_broadening_fwhm_kms(R=R, fwhm_kms=fwhm_kms)
-
         i0 = 0
-        for seg, used_mask in zip(segments, used_masks):
+        for seg, used_mask, seg_fwhm in zip(segments, used_masks, segment_fwhm_kms):
             wave_full = np.asarray(seg.wave, dtype=float)
             flux_full = np.asarray(seg.flux, dtype=float)
 
@@ -718,11 +794,16 @@ def reconstruct_phoenix_legendre_models_for_segments(
             i1 = i0 + n_support
 
             model0_full = model_support_all[i0:i1]
-            shifted_full = velocity_correction(np.c_[wave_full, model0_full], rv_bary_kms + rv_kms)[:, 1]
-            model_broad_full = _gaussian_broaden_velocity(
-                wave_full, shifted_full, fwhm_kms=broadening_fwhm_kms
+            shifted_full = _apply_observed_grid_rv_shift(
+                wave_full,
+                model0_full,
+                rv_bary_kms + rv_kms,
             )
-
+            model_broad_full = _gaussian_broaden_velocity(
+                wave_full,
+                shifted_full,
+                fwhm_kms=seg_fwhm,
+            )
             if np.any(used_mask):
                 w_used = wave_full[used_mask]
                 f_used = flux_full[used_mask]
@@ -749,20 +830,20 @@ def reconstruct_phoenix_legendre_models_for_segments(
             segments,
             default=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
         )
-
+        
         model_raw_list = build_phoenix_native_models_for_segments(
             segments=segments,
             phoenix_wave_native=np.asarray(phoenix_lib.wave, dtype=float),
             template_flux_native=model_dense,
             rv_kms=rv_kms,
             rv_bary_kms=rv_bary_kms,
-            R=R,
+            segment_fwhm_kms=segment_fwhm_kms,
             phoenix_wave_medium=model_wave_medium,
             model_margin_A=model_margin_A,
             bounds_use_fit_mask=True,
             extrapolate=True,
         )
-
+        
         for seg, used_mask, model_broad_full in zip(segments, used_masks, model_raw_list):
             wave_full = np.asarray(seg.wave, dtype=float)
             flux_full = np.asarray(seg.flux, dtype=float)
@@ -796,7 +877,283 @@ def reconstruct_phoenix_legendre_models_for_segments(
 
     return model_full_list, coeffs_list, used_masks, excluded_masks
     
+
+def diagnose_phoenix_fixed_params(
+    segments,
+    phoenix_lib,
+    params,
+    regions=None,
+    exclude_regions=None,
+    exclude_mask=None,
+    mdeg=2,
+    rv_bary_kms=0.0,
+    R=None,
+    fwhm_kms=None,
+    forward_model="native_interp",
+    model_margin_A=200.0,
+):
+    """
+    Evaluate a PHOENIX model at fixed parameters and return per-segment
+    residual diagnostics before and after the multiplicative Legendre continuum.
+
+    This function does not optimize. It is intended for debugging structured
+    residuals and comparing candidate parameter sets on exactly the same
+    data pixels, masks, broadening, wavelength grid, and continuum model.
+
+    Important
+    ---------
+    This diagnostic assumes that phoenix_lib has already been built on the
+    wavelength grid required by the chosen forward_model. The normal use pattern
+    is therefore:
+
+        1. run fit_phoenix_full_spectrum(...)
+        2. call diagnose_phoenix_fixed_params(...) with the same segments,
+           phoenix_lib, forward_model, model_margin_A, R/fwhm settings, and masks.
+
+    Parameters
+    ----------
+    segments : SpectrumSegment, SpectrumCollection, or sequence of SpectrumSegment
+        Spectrum data to diagnose.
+
+    phoenix_lib : PhoenixLibrary
+        PHOENIX library whose interpolator has already been built on the
+        correct support grid.
+
+    params : sequence or dict
+        Either (teff, feh, logg, rv_kms), or a dict containing keys
+        'teff', 'feh', 'logg', and 'rv_kms'.
+
+    Returns
+    -------
+    result : dict
+        Contains per-segment wavelength, flux, error, raw model, continuum-
+        corrected model, residuals, continuum coefficients, and chi-square
+        summaries.
+    """
+    segments, segment_weights, collection_name, collection_meta = _coerce_segments_input(segments)
+
+    if forward_model not in ("interp_observed", "native_interp"):
+        raise ValueError("forward_model must be 'interp_observed' or 'native_interp'.")
+
+    if isinstance(params, dict):
+        teff = float(params["teff"])
+        feh = float(params["feh"])
+        logg = float(params["logg"])
+        if "rv_kms" in params:
+            rv_kms = float(params["rv_kms"])
+        else:
+            rv_kms = float(params["rv"])
+    else:
+        teff, feh, logg, rv_kms = map(float, params)
+
+    (
+        support_wave_all,
+        flux_all,
+        err_all,
+        support_slices,
+        fit_slices,
+        fit_masks,
+        fit_weights,
+        seg_meta,
+    ) = _build_data_vectors(
+        segments,
+        segment_weights=segment_weights,
+        regions=regions,
+        exclude_regions=exclude_regions,
+        exclude_mask=exclude_mask,
+    )
+
+    if support_wave_all.size == 0 or flux_all.size == 0:
+        raise ValueError("No data points selected for fixed-parameter diagnostic.")
+
+    forward_segments = _make_forward_segments(
+        segments=segments,
+        support_wave_all=support_wave_all,
+        support_slices=support_slices,
+        fit_masks=fit_masks,
+    )
+
+    segment_fwhm_kms = [
+        _resolve_segment_fwhm_kms(seg, R=R, fwhm_kms=fwhm_kms)
+        for seg in forward_segments
+    ]
+
+    if forward_model == "interp_observed":
+        model_wave_grid = support_wave_all
+
+        segment_media = sorted(set(str(seg.wave_medium).lower() for seg in segments))
+        if len(segment_media) == 1:
+            model_wave_medium = segment_media[0]
+        else:
+            model_wave_medium = None
+
+        if phoenix_lib.wave is None:
+            raise RuntimeError("PHOENIX interpolator is not built.")
+
+        if (len(phoenix_lib.wave) != len(model_wave_grid)) or (
+            not np.allclose(phoenix_lib.wave, model_wave_grid, rtol=0.0, atol=0.0)
+        ):
+            raise ValueError(
+                "PHOENIX interpolator wavelength grid does not match the "
+                "diagnostic support grid. Run fit_phoenix_full_spectrum first "
+                "with the same segments and forward_model, or rebuild the "
+                "interpolator on this grid."
+            )
+
+    else:
+        model_wave_grid, model_wave_medium = _build_native_interp_wave_grid(
+            forward_segments=forward_segments,
+            phoenix_lib=phoenix_lib,
+            model_margin_A=model_margin_A,
+        )
+
+        if phoenix_lib.wave is None:
+            raise RuntimeError("PHOENIX interpolator is not built.")
+
+        if (len(phoenix_lib.wave) != len(model_wave_grid)) or (
+            not np.allclose(phoenix_lib.wave, model_wave_grid, rtol=0.0, atol=0.0)
+        ):
+            raise ValueError(
+                "PHOENIX interpolator wavelength grid does not match the "
+                "native diagnostic grid. Run fit_phoenix_full_spectrum first "
+                "with the same segments, forward_model, model_margin_A, and "
+                "parameter grid, or rebuild the interpolator on this grid."
+            )
+
+    model0 = np.asarray(phoenix_lib.evaluate(teff, feh, logg), dtype=float)
+
+    if forward_model == "interp_observed":
+        rv_tot = float(rv_bary_kms) + float(rv_kms)
+        shifted = _apply_observed_grid_rv_shift(support_wave_all, model0, rv_tot)
+
+        model_full_list = []
+        for support_sl, seg_fwhm in zip(support_slices, segment_fwhm_kms):
+            w_support = support_wave_all[support_sl]
+            model_full_list.append(
+                _gaussian_broaden_velocity(
+                    w_support,
+                    shifted[support_sl],
+                    fwhm_kms=seg_fwhm,
+                )
+            )
+
+    else:
+        model_full_list = build_phoenix_native_models_for_segments(
+            segments=forward_segments,
+            phoenix_wave_native=model_wave_grid,
+            template_flux_native=model0,
+            rv_kms=rv_kms,
+            rv_bary_kms=rv_bary_kms,
+            segment_fwhm_kms=segment_fwhm_kms,
+            phoenix_wave_medium=model_wave_medium,
+            model_margin_A=model_margin_A,
+            bounds_use_fit_mask=True,
+            extrapolate=True,
+        )
+
+    segment_results = []
+    chi2_raw_total = 0.0
+    chi2_corr_total = 0.0
+    n_total = 0
+
+    for seg, model_raw_full, fit_sl, fit_mask, seg_weight, seg_fwhm, meta in zip(
+        forward_segments,
+        model_full_list,
+        fit_slices,
+        fit_masks,
+        fit_weights,
+        segment_fwhm_kms,
+        seg_meta,
+    ):
+        wave_full = np.asarray(seg.wave, dtype=float)
+        model_raw_full = np.asarray(model_raw_full, dtype=float)
+
+        wave_fit = wave_full[fit_mask]
+        model_raw = model_raw_full[fit_mask]
+        flux = flux_all[fit_sl]
+        err = err_all[fit_sl]
+
+        model_corr, coeffs = _solve_multiplicative_legendre(
+            wave_fit,
+            flux,
+            err,
+            model_raw,
+            mdeg=mdeg,
+        )
+
+        resid_raw = (flux - model_raw) / err
+        resid_corr = (flux - model_corr) / err
+
+        chi2_raw = float(np.sum(resid_raw * resid_raw))
+        chi2_corr = float(np.sum(resid_corr * resid_corr))
+        n = int(resid_corr.size)
+
+        chi2_raw_total += float(seg_weight) * chi2_raw
+        chi2_corr_total += float(seg_weight) * chi2_corr
+        n_total += n
+
+        segment_results.append(
+            {
+                "name": meta.get("name"),
+                "index": meta.get("index"),
+                "weight": float(seg_weight),
+                "wave": wave_fit.copy(),
+                "flux": flux.copy(),
+                "err": err.copy(),
+                "model_raw": model_raw.copy(),
+                "model_corr": model_corr.copy(),
+                "coeffs": np.asarray(coeffs, dtype=float),
+                "resid_raw": resid_raw.copy(),
+                "resid_corr": resid_corr.copy(),
+                "chi2_raw": chi2_raw,
+                "chi2_corr": chi2_corr,
+                "chi2_raw_weighted": float(seg_weight) * chi2_raw,
+                "chi2_corr_weighted": float(seg_weight) * chi2_corr,
+                "chi2_red_corr": chi2_corr / max(1, n - (int(mdeg) + 1)),
+                "n": n,
+                "lsf_fwhm_kms": None if seg_fwhm is None else float(seg_fwhm),
+                "resolution_R_effective": None if seg_fwhm is None else float(C_KMS / seg_fwhm),
+                "wave_min": float(np.min(wave_fit)) if n else np.nan,
+                "wave_max": float(np.max(wave_fit)) if n else np.nan,
+                "resid_corr_median": float(np.nanmedian(resid_corr)) if n else np.nan,
+                "resid_corr_std": float(np.nanstd(resid_corr)) if n else np.nan,
+            }
+        )
+
+    n_cont = len(segment_results) * (int(mdeg) + 1)
+    dof_effective = max(1, int(n_total) - int(n_cont))
+
+    return {
+        "params": {
+            "teff": teff,
+            "feh": feh,
+            "logg": logg,
+            "rv_kms": rv_kms,
+            "rv_bary_kms": float(rv_bary_kms),
+        },
+        "forward_model": str(forward_model),
+        "model_margin_A": float(model_margin_A),
+        "mdeg": int(mdeg),
+        "collection_name": collection_name,
+        "collection_meta": collection_meta,
+        "segments": segment_results,
+        "segment_names": [s["name"] for s in segment_results],
+        "segment_weights": [float(w) for w in fit_weights],
+        "segment_lsf_fwhm_kms": [
+            None if x is None else float(x) for x in segment_fwhm_kms
+        ],
+        "segment_resolution_R_effective": [
+            None if x is None else float(C_KMS / x) for x in segment_fwhm_kms
+        ],
+        "chi2_raw_total": float(chi2_raw_total),
+        "chi2_corr_total": float(chi2_corr_total),
+        "n_total": int(n_total),
+        "n_continuum_params": int(n_cont),
+        "dof_effective": int(dof_effective),
+        "chi2_red_corr_effective": float(chi2_corr_total / dof_effective),
+    }
     
+
 def default_telluric_regions_optical_angstrom():
     """
     Very small default set of strong O2 bands in the optical.
@@ -843,13 +1200,16 @@ def fit_phoenix_full_spectrum(
     forwarded to the data using one of two wavelength-space model paths:
 
     - `forward_model="interp_observed"`:
-      interpolate directly on the observed support wavelength grid, then shift
-      and broaden there. This is the original fast path.
+      interpolate directly on the observed support wavelength grid, then apply the
+      PHOENIX RV convention through _apply_observed_grid_rv_shift(), and broaden
+      there. This is a legacy/fast compatibility path. It is not the recommended
+      scientific path when line profiles are important.
 
     - `forward_model="native_interp"`:
       interpolate on a dense model-space wavelength grid, then apply the
-      notebook-faithful forward-model order: shift on that dense grid, convolve
-      at constant resolving power, and resample last to each segment support grid.
+      standard-sign RV shift, convolve in velocity/log-lambda space, and resample
+      last to each segment support grid. This is the recommended scientific path
+      for PHOENIX line-profile fitting.
 
     In both cases, the model is multiplied by a per-segment Legendre polynomial
     continuum solved analytically by weighted least squares.
@@ -894,7 +1254,17 @@ def fit_phoenix_full_spectrum(
 
     rv_bary_kms : float, optional
         Fixed barycentric velocity term in km/s added to the fitted `rv_kms`.
+        It must use the same standard sign convention as `rv_kms`: positive values
+        redshift the template/model.
 
+    RV sign convention
+    ------------------
+    The returned rv_kms follows the standard astronomical convention: positive
+    rv_kms redshifts the template/model spectrum. The legacy
+    Spyctres.velocity_correction helper is not modified; the observed-grid
+    compatibility branch wraps it internally so that PHOENIX fitting results use
+    this convention consistently with native_interp.
+    
     R : float, optional
         Resolving power of the Gaussian instrumental line-spread function,
         defined as `R = lambda / Delta_lambda_FWHM`. If provided, this is
@@ -968,12 +1338,7 @@ def fit_phoenix_full_spectrum(
         
     if forward_model not in ("interp_observed", "native_interp"):
         raise ValueError("forward_model must be 'interp_observed' or 'native_interp'.")
-        
-    if forward_model == "native_interp" and fwhm_kms is not None:
-        raise NotImplementedError(
-            "forward_model='native_interp' currently supports R-based broadening only."
-        )
-        
+            
     (
         support_wave_all,
         flux_all,
@@ -999,6 +1364,11 @@ def fit_phoenix_full_spectrum(
         support_slices=support_slices,
         fit_masks=fit_masks,
     )
+    
+    segment_fwhm_kms = [
+        _resolve_segment_fwhm_kms(seg, R=R, fwhm_kms=fwhm_kms)
+        for seg in forward_segments
+    ]
     
     teff0, feh0, logg0, rv0 = map(float, p0)
     # Materialize the requested PHOENIX subgrid before deciding whether the
@@ -1103,22 +1473,23 @@ def fit_phoenix_full_spectrum(
         out = np.empty_like(flux_all)
 
         if forward_model == "interp_observed":
-            spec = np.c_[support_wave_all, model0]
-            shifted = velocity_correction(spec, rv_tot)[:, 1]
-
-            for support_sl, fit_sl, fit_mask, seg_weight in zip(
-                support_slices, fit_slices, fit_masks, fit_weights
+            shifted = _apply_observed_grid_rv_shift(support_wave_all, model0, rv_tot)
+            
+            for support_sl, fit_sl, fit_mask, seg_weight, seg_fwhm in zip(
+                support_slices, fit_slices, fit_masks, fit_weights, segment_fwhm_kms
             ):
                 w_support = support_wave_all[support_sl]
                 m_support = _gaussian_broaden_velocity(
-                    w_support, shifted[support_sl], fwhm_kms=broadening_fwhm_kms
+                    w_support,
+                    shifted[support_sl],
+                    fwhm_kms=seg_fwhm,
                 )
-
+                
                 w = w_support[fit_mask]
                 f = flux_all[fit_sl]
                 e = err_all[fit_sl]
                 m = m_support[fit_mask]
-
+                
                 m_corr, coeffs = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
                 out[fit_sl] = np.sqrt(float(seg_weight)) * (f - m_corr) / e
         else:
@@ -1128,13 +1499,13 @@ def fit_phoenix_full_spectrum(
                 template_flux_native=model0,
                 rv_kms=rv_kms,
                 rv_bary_kms=rv_bary_kms,
-                R=R,
+                segment_fwhm_kms=segment_fwhm_kms,
                 phoenix_wave_medium=model_wave_medium,
                 model_margin_A=model_margin_A,
                 bounds_use_fit_mask=True,
                 extrapolate=True,
             )
-
+            
             for seg, model_full, fit_sl, fit_mask, seg_weight in zip(
                 forward_segments, model_list, fit_slices, fit_masks, fit_weights
             ):
@@ -1173,7 +1544,7 @@ def fit_phoenix_full_spectrum(
                     phoenix_lib,
                     mdeg=mdeg,
                     decimate=rv_grid_decimate,
-                    broadening_fwhm_kms=broadening_fwhm_kms,
+                    segment_fwhm_kms=segment_fwhm_kms,
                 )
             else:
                 chi2s[j] = _chi2_for_params_native_interp(
@@ -1192,7 +1563,7 @@ def fit_phoenix_full_spectrum(
                     model_wave_medium=model_wave_medium,
                     mdeg=mdeg,
                     decimate=rv_grid_decimate,
-                    R=R,
+                    segment_fwhm_kms=segment_fwhm_kms,
                     model_margin_A=model_margin_A,
                 )
         rv0_best = float(rv_grid[int(np.argmin(chi2s))])
@@ -1251,6 +1622,15 @@ def fit_phoenix_full_spectrum(
         "segment_weights": [float(w) for w in fit_weights],
         "collection_name": collection_name,
         "collection_meta": collection_meta,
+        "segment_lsf_fwhm_kms": [
+            None if x is None else float(x) for x in segment_fwhm_kms
+        ],
+        "segment_resolution_R_effective": [
+            None if x is None else float(C_KMS / x) for x in segment_fwhm_kms
+        ],
+        # Backward-compatible global broadening metadata.
+        # The actual per-segment broadening used in the fit is stored above in
+        # segment_lsf_fwhm_kms and segment_resolution_R_effective.
         "resolution_R": None if R is None else float(R),
         "lsf_fwhm_kms": None if broadening_fwhm_kms is None else float(broadening_fwhm_kms),
         # Note: did not store poly coeffs in this minimal version to avoid re-evaluating.

@@ -554,7 +554,7 @@ def main():
         "--forward-model",
         choices=["interp_observed", "native_interp"],
         default="interp_observed",
-        help="Forward-model path. 'native_interp' is the validated wavelength-space reference; 'interp_observed' is the legacy observed-grid path.",
+        help="Forward-model path. 'native_interp' is the validated wavelength-space reference and the recommended path; 'interp_observed' is the legacy observed-grid path.",
     )
     parser.add_argument(
         "--model-margin",
@@ -580,8 +580,8 @@ def main():
     parser.add_argument("--clip-right", type=int, default=0, help="Clip this many pixels from the right edge")
     parser.add_argument("--balmer-only", action="store_true",
                         help="Fit only Balmer windows instead of the full selected wavelength range")
-    parser.add_argument("--core-mask", type=float, default=3.0,
-                        help="Half-width in Angstrom to mask around Balmer line centers in --balmer-only mode. The validated notebook-style benchmark uses 12.")
+    parser.add_argument("--core-mask", type=float, default=10.0,
+                        help="Half-width in Angstrom to mask around Balmer line centers in --balmer-only mode. For X-SHOOTER UVB Balmer-wing classification, 6-12 A is the recommended range to explore.")
     parser.add_argument("--window-pad", type=float, default=5.0,
                         help="Padding in Angstrom added on each side of Balmer fit windows")
     parser.add_argument(

@@ -7,6 +7,31 @@ from .waveutils import convert_wavelength_medium
 
 C_KMS = 299792.458
 
+def _coerce_segment_list(segments):
+    """
+    Normalize a segment-like input to a non-empty plain list.
+
+    Accepted inputs
+    ---------------
+    - a single segment-like object with a ``wave`` attribute
+    - a list/tuple of such objects
+    - a collection-like object with a ``segments`` attribute
+    """
+    if hasattr(segments, "segments"):
+        seg_list = list(getattr(segments, "segments"))
+    elif isinstance(segments, (list, tuple)):
+        seg_list = list(segments)
+    else:
+        seg_list = [segments]
+
+    if len(seg_list) == 0:
+        raise ValueError("No segments were provided.")
+
+    for i, seg in enumerate(seg_list):
+        if not hasattr(seg, "wave"):
+            raise TypeError("Item {0} does not look like a spectrum segment.".format(i))
+
+    return seg_list
 
 def _normalize_wave_medium(wave_medium, default="unknown"):
     if wave_medium is None:
@@ -19,12 +44,15 @@ def _normalize_wave_medium(wave_medium, default="unknown"):
 
 def infer_segments_wave_medium(segments, default="unknown"):
     """
-    Infer a common wavelength medium from a list of SpectrumSegment objects.
+    Infer a common wavelength medium from a segment list or collection.
 
-    Returns:
-        - "air" or "vacuum" if all segments agree on a recognized medium
-        - default otherwise
+    Returns
+    -------
+    str
+        "air" or "vacuum" if all segments agree on a recognized medium,
+        otherwise ``default`` normalized through _normalize_wave_medium().
     """
+    segments = _coerce_segment_list(segments)
     media = sorted(set(_normalize_wave_medium(seg.wave_medium, default=default) for seg in segments))
     if len(media) == 1 and media[0] in ("air", "vacuum"):
         return media[0]
@@ -35,9 +63,18 @@ def fit_bounds_from_segments(segments, use_fit_mask=True):
     """
     Return the min/max wavelength bounds that should define the model support.
 
-    By default this uses only seg.mask == True pixels, not the full segment
-    support. This matches the notebook-faithful X-SHOOTER logic.
+    Parameters
+    ----------
+    segments : segment list or collection
+    use_fit_mask : bool, default=True
+        If True, only seg.mask-selected pixels contribute to the bounds.
+
+    Returns
+    -------
+    (wmin, wmax) : tuple[float, float]
     """
+    segments = _coerce_segment_list(segments)
+
     los = []
     his = []
 
@@ -122,19 +159,31 @@ def doppler_shift_wave(wave_A, rv_kms):
     return wave_A * (1.0 + float(rv_kms) / C_KMS)
 
 
-def convolve_to_resolution_loglam(wave_A, flux, R):
+def convolve_to_resolution_loglam(wave_A, flux, R=None, fwhm_kms=None):
     """
-    Convolve a spectrum with a Gaussian LSF at constant resolving power R
-    on a log-lambda grid.
+    Convolve a spectrum with a Gaussian LSF on a log-lambda grid.
 
-    This is the native-grid broadening step validated against the Gaia21ccu
-    X-SHOOTER notebook reference.
+    Exactly one of ``R`` or ``fwhm_kms`` may be supplied. If both are None,
+    the input flux is returned unchanged.
     """
     wave_A = np.asarray(wave_A, dtype=np.float64)
     flux = np.asarray(flux, dtype=np.float64)
 
-    if R is None:
+    if (R is not None) and (fwhm_kms is not None):
+        raise ValueError("Provide only one of R or fwhm_kms, not both.")
+
+    if fwhm_kms is None and R is None:
         return flux.copy()
+
+    if fwhm_kms is None:
+        R = float(R)
+        if R <= 0:
+            raise ValueError("R must be > 0.")
+        fwhm_kms = C_KMS / R
+    else:
+        fwhm_kms = float(fwhm_kms)
+        if fwhm_kms <= 0:
+            raise ValueError("fwhm_kms must be > 0.")
 
     if not np.all(np.diff(wave_A) > 0):
         idx = np.argsort(wave_A)
@@ -153,14 +202,13 @@ def convolve_to_resolution_loglam(wave_A, flux, R):
     if (not np.isfinite(dloglam)) or (dloglam <= 0):
         return flux.copy()
 
-    sigma_v = C_KMS / (float(R) * 2.3548200450309493)
+    sigma_v = fwhm_kms / 2.3548200450309493
     sigma_pix = (sigma_v / C_KMS) / dloglam
 
     if sigma_pix < 0.3:
         return flux.copy()
 
     return gaussian_filter1d(flux, sigma_pix, mode="nearest")
-
 
 def resample_flux(w_src, f_src, w_tgt, extrapolate=True):
     """
@@ -204,6 +252,7 @@ def build_phoenix_native_model_to_wave(
     rv_kms=0.0,
     rv_bary_kms=0.0,
     R=None,
+    fwhm_kms=None,
     target_wave_medium="vacuum",
     phoenix_wave_medium="vacuum",
     wmin=None,
@@ -235,7 +284,7 @@ def build_phoenix_native_model_to_wave(
     w_shift = w_shift[m]
     f_native = f_native[m]
 
-    f_conv = convolve_to_resolution_loglam(w_shift, f_native, R)
+    f_conv = convolve_to_resolution_loglam(w_shift, f_native, R=R, fwhm_kms=fwhm_kms)
 
     return resample_flux(
         w_src=w_shift,
@@ -252,6 +301,8 @@ def build_phoenix_native_models_for_segments(
     rv_kms=0.0,
     rv_bary_kms=0.0,
     R=None,
+    fwhm_kms=None,
+    segment_fwhm_kms=None,
     phoenix_wave_medium="vacuum",
     model_margin_A=200.0,
     bounds_use_fit_mask=True,
@@ -259,13 +310,25 @@ def build_phoenix_native_models_for_segments(
     return_native=False,
 ):
     """
-    Build one PHOENIX model array per segment using the validated native-grid
+    Build one PHOENIX model array per segment using the native-grid
     forward-model order.
 
-    This function is intentionally continuum-agnostic. It returns only the
-    physical template prediction on each segment grid. Continuum nuisance terms
-    should be handled by fitting.py.
+    This function is continuum-agnostic. It returns only the physical template
+    prediction on each segment grid. Continuum nuisance terms should be handled
+    by higher-level fitting code.
+
+    Parameters
+    ----------
+    segments : segment list or collection
+    R, fwhm_kms : float, optional
+        Global instrumental broadening specification. Exactly one may be
+        supplied. Ignored if ``segment_fwhm_kms`` is provided.
+    segment_fwhm_kms : sequence, optional
+        Per-segment Gaussian LSF FWHM values in km/s. If supplied, must match
+        the number of kept segments.
     """
+    segments = _coerce_segment_list(segments)
+
     target_wave_medium = infer_segments_wave_medium(
         segments,
         default=phoenix_wave_medium,
@@ -293,17 +356,40 @@ def build_phoenix_native_models_for_segments(
     w_shift = w_shift[m]
     f_native = f_native[m]
 
-    f_conv = convolve_to_resolution_loglam(w_shift, f_native, R)
+    if segment_fwhm_kms is None:
+        if (R is not None) and (fwhm_kms is not None):
+            raise ValueError("Provide only one of R or fwhm_kms, not both.")
+        if fwhm_kms is None and R is None:
+            segment_fwhm_kms = [None] * len(segments)
+        elif fwhm_kms is not None:
+            segment_fwhm_kms = [float(fwhm_kms)] * len(segments)
+        else:
+            segment_fwhm_kms = [C_KMS / float(R)] * len(segments)
+    else:
+        if len(segment_fwhm_kms) != len(segments):
+            raise ValueError("segment_fwhm_kms must match the number of segments.")
+        segment_fwhm_kms = [None if x is None else float(x) for x in segment_fwhm_kms]
 
-    model_list = [
-        resample_flux(
-            w_src=w_shift,
-            f_src=f_conv,
-            w_tgt=np.asarray(seg.wave, dtype=float),
-            extrapolate=extrapolate,
+    conv_cache = {}
+    model_list = []
+
+    for seg, seg_fwhm in zip(segments, segment_fwhm_kms):
+        key = None if seg_fwhm is None else float(seg_fwhm)
+        if key not in conv_cache:
+            conv_cache[key] = convolve_to_resolution_loglam(
+                w_shift,
+                f_native,
+                fwhm_kms=key,
+            )
+
+        model_list.append(
+            resample_flux(
+                w_src=w_shift,
+                f_src=conv_cache[key],
+                w_tgt=np.asarray(seg.wave, dtype=float),
+                extrapolate=extrapolate,
+            )
         )
-        for seg in segments
-    ]
 
     if not return_native:
         return model_list
@@ -314,18 +400,5 @@ def build_phoenix_native_models_for_segments(
         "wmax_fit": float(wmax),
         "wave_native_prepared": w_native,
         "wave_shifted": w_shift,
-        "flux_convolved": f_conv,
+        "segment_fwhm_kms": segment_fwhm_kms,
     }
-
-
-__all__ = [
-    "C_KMS",
-    "infer_segments_wave_medium",
-    "fit_bounds_from_segments",
-    "prepare_phoenix_native_template",
-    "doppler_shift_wave",
-    "convolve_to_resolution_loglam",
-    "resample_flux",
-    "build_phoenix_native_model_to_wave",
-    "build_phoenix_native_models_for_segments",
-]
