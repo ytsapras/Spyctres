@@ -20,7 +20,7 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from .io import SpectrumSegment
-from .waveutils import convert_wavelength_medium
+from .waveutils import convert_wavelength_medium, C_KMS
 from .fitting import (
     build_effective_fit_mask,
     build_excluded_mask,
