@@ -110,6 +110,19 @@ class PhoenixLibrary(object):
           Z-1.0/
             ...
 
+    Wavelength-grid state:
+    
+    self.phoenix_wave
+         Immutable native PHOENIX wavelength grid loaded from the PHOENIX wavelength
+         file. This is the high-resolution template grid on disk and should be used
+         whenever a native-grid forward model needs to be constructed.
+    
+    self.wave
+         Current interpolator/evaluation grid. This is set by build_interpolator().
+         It may be an observed support grid for interp_observed, or a clipped
+         model-space grid for native_interp. It should not be treated as the native
+         PHOENIX grid.
+
     This class supports:
       - Loading a single template (and optionally resampling to a target wave grid)
       - Building a cached regular-grid interpolator on (Teff, [Fe/H], logg)
