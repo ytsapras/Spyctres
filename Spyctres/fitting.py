@@ -1,7 +1,6 @@
 # Spyctres/fitting.py
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.ndimage import gaussian_filter1d
 from numpy.polynomial.legendre import legvander
 
 # Legacy helper. Do not call directly inside PHOENIX fitting paths.
@@ -16,6 +15,7 @@ from .phoenix_forward import (
     prepare_phoenix_native_template,
     build_phoenix_native_models_for_segments,
     build_native_interp_wave_grid_for_segments,
+    convolve_to_resolution_loglam,
 )
 # Why multiplicative polynomial: it is a standard way to absorb low-frequency continuum differences and calibration mismatches during full-spectrum fitting.
 
@@ -142,46 +142,17 @@ def _resolve_segment_fwhm_kms(seg, R=None, fwhm_kms=None):
     
 def _gaussian_broaden_velocity(wave, flux, fwhm_kms=None):
     """
-    Convolve a spectrum with a Gaussian LSF of constant FWHM in velocity space.
+    Compatibility wrapper for Gaussian velocity-space broadening.
 
-    Implementation:
-    1) resample onto a uniform log-lambda grid
-    2) Gaussian filter in pixel space
-    3) interpolate back onto the input wave grid
+    The canonical implementation lives in Spyctres.phoenix_forward as
+    convolve_to_resolution_loglam(), because instrumental broadening is part of
+    the forward model. This wrapper is kept temporarily for older internal calls.
     """
-    wave = np.asarray(wave, dtype=float)
-    flux = np.asarray(flux, dtype=float)
-
-    if fwhm_kms is None:
-        return flux.copy()
-
-    good = np.isfinite(wave) & np.isfinite(flux) & (wave > 0)
-    if np.sum(good) < 5:
-        return flux.copy()
-
-    w = wave[good]
-    f = flux[good]
-
-    lnw = np.log(w)
-    dln = np.nanmedian(np.diff(lnw))
-    if (not np.isfinite(dln)) or (dln <= 0):
-        return flux.copy()
-
-    lnw_uniform = np.arange(lnw[0], lnw[-1] + 0.5 * dln, dln)
-    f_uniform = np.interp(lnw_uniform, lnw, f)
-
-    sigma_kms = float(fwhm_kms) / 2.3548200450309493
-    dv_per_pix = C_KMS * dln
-    sigma_pix = sigma_kms / dv_per_pix
-
-    if (not np.isfinite(sigma_pix)) or (sigma_pix <= 0):
-        return flux.copy()
-
-    f_broad = gaussian_filter1d(f_uniform, sigma_pix, mode="nearest")
-
-    out = np.array(flux, copy=True, dtype=float)
-    out[good] = np.interp(lnw, lnw_uniform, f_broad)
-    return out
+    return convolve_to_resolution_loglam(
+        wave_A=wave,
+        flux=flux,
+        fwhm_kms=fwhm_kms,
+    )
 
 
 def _to_bool_mask(x, threshold=0.5):
