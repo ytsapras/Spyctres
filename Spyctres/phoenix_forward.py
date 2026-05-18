@@ -207,11 +207,15 @@ def convolve_to_resolution_loglam(wave_A, flux, R=None, fwhm_kms=None):
     """
     Convolve a spectrum with a Gaussian LSF on a log-lambda grid.
 
+    The returned array always has the same shape and ordering as the input flux.
     Exactly one of ``R`` or ``fwhm_kms`` may be supplied. If both are None,
     the input flux is returned unchanged.
     """
     wave_A = np.asarray(wave_A, dtype=np.float64)
     flux = np.asarray(flux, dtype=np.float64)
+
+    if wave_A.shape != flux.shape:
+        raise ValueError("wave_A and flux must have the same shape.")
 
     if (R is not None) and (fwhm_kms is not None):
         raise ValueError("Provide only one of R or fwhm_kms, not both.")
@@ -229,30 +233,37 @@ def convolve_to_resolution_loglam(wave_A, flux, R=None, fwhm_kms=None):
         if fwhm_kms <= 0:
             raise ValueError("fwhm_kms must be > 0.")
 
-    if not np.all(np.diff(wave_A) > 0):
-        idx = np.argsort(wave_A)
-        wave_A = wave_A[idx]
-        flux = flux[idx]
-
-    m = np.isfinite(wave_A) & (wave_A > 0) & np.isfinite(flux)
-    wave_A = wave_A[m]
-    flux = flux[m]
-
-    if len(wave_A) < 5:
+    good = np.isfinite(wave_A) & (wave_A > 0) & np.isfinite(flux)
+    if np.sum(good) < 5:
         return flux.copy()
 
-    loglam = np.log(wave_A)
-    dloglam = np.median(np.diff(loglam))
+    w_good = wave_A[good]
+    f_good = flux[good]
+
+    order = np.argsort(w_good)
+    w_sorted = w_good[order]
+    f_sorted = f_good[order]
+
+    loglam = np.log(w_sorted)
+    dloglam = np.nanmedian(np.diff(loglam))
     if (not np.isfinite(dloglam)) or (dloglam <= 0):
         return flux.copy()
 
     sigma_v = fwhm_kms / 2.3548200450309493
     sigma_pix = (sigma_v / C_KMS) / dloglam
 
-    if sigma_pix < 0.3:
+    if (not np.isfinite(sigma_pix)) or (sigma_pix < 0.3):
         return flux.copy()
 
-    return gaussian_filter1d(flux, sigma_pix, mode="nearest")
+    f_conv_sorted = gaussian_filter1d(f_sorted, sigma_pix, mode="nearest")
+
+    f_conv_good = np.empty_like(f_good)
+    f_conv_good[order] = f_conv_sorted
+
+    out = flux.copy()
+    out[good] = f_conv_good
+    return out
+    
 
 def resample_flux(w_src, f_src, w_tgt, extrapolate=True):
     """
