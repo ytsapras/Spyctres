@@ -15,6 +15,7 @@ from .phoenix_forward import (
     fit_bounds_from_segments,
     prepare_phoenix_native_template,
     build_phoenix_native_models_for_segments,
+    build_native_interp_wave_grid_for_segments,
 )
 # Why multiplicative polynomial: it is a standard way to absorb low-frequency continuum differences and calibration mismatches during full-spectrum fitting.
 
@@ -528,40 +529,6 @@ def _make_forward_segments(segments, support_wave_all, support_slices, fit_masks
     return out
 
 
-def _build_native_interp_wave_grid(forward_segments, phoenix_lib, model_margin_A=200.0):
-    """
-    Build a dense wavelength grid for the native_interp branch.
-
-    The grid is a prepared subset of the native PHOENIX wavelength grid, already
-    converted into the segments' wavelength medium and restricted to the fit
-    bounds plus margin.
-    """
-    target_wave_medium = infer_segments_wave_medium(
-        forward_segments,
-        default=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
-    )
-
-    wmin_fit, wmax_fit = fit_bounds_from_segments(
-        forward_segments,
-        use_fit_mask=True,
-    )
-    
-    if getattr(phoenix_lib, "phoenix_wave", None) is None:
-        raise ValueError("phoenix_lib.phoenix_wave is not initialized.")
-        
-    model_wave_grid, _dummy_flux = prepare_phoenix_native_template(
-        phoenix_wave_native=np.asarray(phoenix_lib.phoenix_wave, dtype=float),
-        template_flux_native=np.ones_like(np.asarray(phoenix_lib.phoenix_wave, dtype=float)),
-        target_wave_medium=target_wave_medium,
-        phoenix_wave_medium=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
-        wmin=wmin_fit,
-        wmax=wmax_fit,
-        margin_A=model_margin_A,
-    )
-
-    return model_wave_grid, target_wave_medium
-
-
 def _chi2_for_params_native_interp(
     forward_segments,
     flux_all,
@@ -1001,8 +968,8 @@ def diagnose_phoenix_fixed_params(
             )
 
     else:
-        model_wave_grid, model_wave_medium = _build_native_interp_wave_grid(
-            forward_segments=forward_segments,
+        model_wave_grid, model_wave_medium = build_native_interp_wave_grid_for_segments(
+            segments=forward_segments,
             phoenix_lib=phoenix_lib,
             model_margin_A=model_margin_A,
         )
@@ -1403,8 +1370,8 @@ def fit_phoenix_full_spectrum(
         else:
             model_wave_medium = None
     else:
-        model_wave_grid, model_wave_medium = _build_native_interp_wave_grid(
-            forward_segments=forward_segments,
+        model_wave_grid, model_wave_medium = build_native_interp_wave_grid_for_segments(
+            segments=forward_segments,
             phoenix_lib=phoenix_lib,
             model_margin_A=model_margin_A,
         )

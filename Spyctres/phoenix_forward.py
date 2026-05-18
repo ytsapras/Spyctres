@@ -95,6 +95,52 @@ def fit_bounds_from_segments(segments, use_fit_mask=True):
     return min(los), max(his)
 
 
+def build_native_interp_wave_grid_for_segments(
+    segments,
+    phoenix_lib,
+    model_margin_A=200.0,
+):
+    """
+    Build the native PHOENIX wavelength grid needed for native_interp modeling.
+
+    The returned grid is a clipped subset of phoenix_lib.phoenix_wave, converted
+    into the common wavelength medium of the supplied segments and restricted
+    to the fit-mask bounds plus a margin.
+
+    This helper deliberately uses phoenix_lib.phoenix_wave, not phoenix_lib.wave.
+    phoenix_lib.wave is the current interpolator grid and may already be an
+    observed or cached model grid.
+    """
+    segments = _coerce_segment_list(segments)
+
+    if getattr(phoenix_lib, "phoenix_wave", None) is None:
+        raise ValueError("phoenix_lib.phoenix_wave is not initialized.")
+
+    model_wave_medium = infer_segments_wave_medium(
+        segments,
+        default=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
+    )
+
+    fit_min, fit_max = fit_bounds_from_segments(
+        segments,
+        use_fit_mask=True,
+    )
+
+    phoenix_wave = np.asarray(phoenix_lib.phoenix_wave, dtype=float)
+
+    model_wave_grid, _dummy_flux = prepare_phoenix_native_template(
+        phoenix_wave_native=phoenix_wave,
+        template_flux_native=np.ones_like(phoenix_wave, dtype=float),
+        target_wave_medium=model_wave_medium,
+        phoenix_wave_medium=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
+        wmin=float(fit_min),
+        wmax=float(fit_max),
+        margin_A=float(model_margin_A),
+    )
+
+    return model_wave_grid, model_wave_medium
+    
+    
 def prepare_phoenix_native_template(
     phoenix_wave_native,
     template_flux_native,

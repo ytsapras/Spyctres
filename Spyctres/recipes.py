@@ -35,6 +35,7 @@ from .phoenix_forward import (
     infer_segments_wave_medium,
     fit_bounds_from_segments,
     prepare_phoenix_native_template,
+    build_native_interp_wave_grid_for_segments,
 )
 
 BALMER_CENTERS_VAC = {
@@ -252,36 +253,6 @@ def ensure_phoenix_interpolator_for_segments(
         )
 
     return support_wave_all
-
-
-def _build_native_interp_wave_grid_for_segments(segments, phoenix_lib, model_margin_A=200.0):
-    """
-    Build the dense wavelength grid used by the native_interp sideband fitter.
-    """
-    if getattr(phoenix_lib, "phoenix_wave", None) is None:
-        raise ValueError("phoenix_lib.phoenix_wave is not initialized.")
-
-    target_wave_medium = infer_segments_wave_medium(
-        segments,
-        default=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
-    )
-
-    wmin_fit, wmax_fit = fit_bounds_from_segments(
-        segments,
-        use_fit_mask=True,
-    )
-
-    model_wave_grid, _dummy_flux = prepare_phoenix_native_template(
-        phoenix_wave_native=np.asarray(phoenix_lib.phoenix_wave, dtype=float),
-        template_flux_native=np.ones_like(np.asarray(phoenix_lib.phoenix_wave, dtype=float)),
-        target_wave_medium=target_wave_medium,
-        phoenix_wave_medium=getattr(phoenix_lib, "phoenix_wave_medium", "vacuum"),
-        wmin=wmin_fit,
-        wmax=wmax_fit,
-        margin_A=model_margin_A,
-    )
-
-    return model_wave_grid, target_wave_medium
 
 
 def _build_sideband_mask(seg, wave, fit_mask, sideband_width=10.0):
@@ -671,7 +642,7 @@ def fit_phoenix_sideband_symmetric(
             cache_path=cache_path,
         )
     else:
-        model_wave_grid, model_wave_medium = _build_native_interp_wave_grid_for_segments(
+        model_wave_grid, model_wave_medium = build_native_interp_wave_grid_for_segments(
             segments=segments,
             phoenix_lib=phoenix_lib,
             model_margin_A=model_margin_A,
