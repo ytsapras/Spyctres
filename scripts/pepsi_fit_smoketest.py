@@ -70,7 +70,7 @@ def build_parser():
             "This script has two roles:\n"
             "  1. quicklook: a generic one-file PEPSI full-spectrum/window fit;\n"
             "  2. legacy_max: a PEPSI line-window comparison mode that mimics the\n"
-            "     local model/max(model) normalization used in earlier PEPSI analysis.\n"
+            "     local model/max(model) normalization used in PEPSI line-window tests.\n"
             "\n"
             "For normal development, prefer one of the named presets. Expert flags\n"
             "remain available for diagnostics and sensitivity tests."
@@ -150,16 +150,16 @@ def build_window_segments(seg, window_defs, pad=2.0):
 
 def _flag_present(argv, dest):
     """
-    Return True if the corresponding CLI flag was explicitly given.
+    Return True if the corresponding flag was explicitly given.
 
-    This lets preset values behave like defaults: explicit CLI flags win.
+    This lets preset values behave like defaults: explicit flags win.
     """
     flag = "--" + str(dest).replace("_", "-")
     return any(arg == flag or arg.startswith(flag + "=") for arg in argv)
 
 
 def apply_named_preset(args, argv):
-    """Apply a named PEPSI fitting preset, while keeping explicit CLI flags in control."""
+    """Apply a named PEPSI fitting preset, while keeping explicit flags in control."""
     preset = getattr(args, "preset", None)
     if preset is None:
         return args
@@ -608,7 +608,7 @@ def main():
             "Recommended: pepsi_legacy_red_fast for development, "
             "pepsi_legacy_red_full for a slower red-window diagnostic, "
             "or pepsi_quicklook for a single-file generic fit. "
-            "Explicit CLI flags override preset values."
+            "Explicit flags override preset values."
         ),
     )
     standard.add_argument(
