@@ -1209,6 +1209,66 @@ def make_pepsi_legacy_cache_support_segments(
     return support_segments
 
 
+def evaluate_pepsi_legacy_max_models(
+    phoenix_lib,
+    segments,
+    model_wave_grid,
+    model_wave_medium,
+    teff,
+    feh,
+    logg,
+    rv_kms,
+    rv_bary_kms,
+    R,
+    model_margin_A,
+):
+    template_flux = np.asarray(phoenix_lib.evaluate(teff, feh, logg), dtype=float)
+    segment_fwhm_kms = [segment_fwhm_kms_from_R(seg, R=R) for seg in segments]
+    return build_phoenix_native_models_for_segments(
+        segments=segments,
+        phoenix_wave_native=model_wave_grid,
+        template_flux_native=template_flux,
+        rv_kms=float(rv_kms),
+        rv_bary_kms=float(rv_bary_kms),
+        segment_fwhm_kms=segment_fwhm_kms,
+        phoenix_wave_medium=model_wave_medium,
+        model_margin_A=model_margin_A,
+        bounds_use_fit_mask=True,
+        extrapolate=True,
+    )
+
+
+def pepsi_legacy_max_likelihood_terms(seg, model_full, log_err_scale=0.0):
+    """
+    Return likelihood terms for one window.
+
+    The model is normalized by its maximum on the used pixels in the window,
+    matching the old model/max(model) comparison. The errors are scaled by
+    10**log_err_scale and used as variances in a Gaussian negative log-likelihood.
+    """
+    wave = np.asarray(seg.wave, dtype=float)
+    flux = np.asarray(seg.flux, dtype=float)
+    err = np.asarray(seg.err, dtype=float)
+    model_full = np.asarray(model_full, dtype=float)
+    used = np.asarray(seg.mask, dtype=bool)
+    used &= np.isfinite(wave) & np.isfinite(flux) & np.isfinite(err) & (err > 0)
+    used &= np.isfinite(model_full)
+
+    if np.sum(used) < 4:
+        return np.inf, 0, np.full_like(model_full, np.nan, dtype=float), used
+
+    mmax = float(np.nanmax(model_full[used]))
+    if (not np.isfinite(mmax)) or mmax == 0.0:
+        return np.inf, 0, np.full_like(model_full, np.nan, dtype=float), used
+
+    model_norm = model_full / mmax
+    sigma = (10.0 ** float(log_err_scale)) * err[used]
+    var = sigma * sigma
+    resid = flux[used] - model_norm[used]
+    nll_terms = resid * resid / var + np.log(2.0 * np.pi * var)
+    return float(np.sum(nll_terms)), int(np.sum(used)), model_norm, used
+    
+    
 def segment_fwhm_kms_from_R(seg, R=None):
     if R is None:
         R = getattr(seg, "meta", {}).get("resolution_R", None)
@@ -1308,4 +1368,6 @@ __all__ = [
     "segment_fwhm_kms_from_R",
     "ensure_phoenix_native_interpolator_for_segments",
     "pick_grid_range",
+    "evaluate_pepsi_legacy_max_models",
+    "pepsi_legacy_max_likelihood_terms",
 ]
