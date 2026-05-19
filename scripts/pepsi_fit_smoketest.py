@@ -1,6 +1,7 @@
 import os
 import argparse
 import warnings
+import sys
 
 # pysynphot is legacy and emits a pkg_resources deprecation warning.
 # Suppress it in smoke-test scripts to keep output readable.
@@ -132,7 +133,71 @@ def build_window_segments(seg, window_defs, pad=2.0):
         seg_i.name = label
     return segments
 
+def _flag_present(argv, dest):
+    """
+    Return True if the corresponding CLI flag was explicitly given.
 
+    This lets preset values behave like defaults: explicit CLI flags win.
+    """
+    flag = "--" + str(dest).replace("_", "-")
+    return any(arg == flag or arg.startswith(flag + "=") for arg in argv)
+
+
+def apply_named_preset(args, argv):
+    """
+    Apply a named PEPSI fitting preset, while keeping explicit CLI flags in control.
+    """
+    preset = getattr(args, "preset", None)
+    if preset is None:
+        return args
+
+    if preset == "pepsi_legacy_red_fast":
+        preset_values = {
+            "mode": "legacy_max",
+            "fast": True,
+            "wave_hypothesis": "air",
+            "forward_model": "native_interp",
+            "use_ssbvel": True,
+            "use_telluric_mask": True,
+            "teff0": 5500.0,
+            "feh0": -1.0,
+            "logg0": 3.0,
+            "rv0": -50.0,
+        }
+
+    elif preset == "pepsi_legacy_red_full":
+        preset_values = {
+            "mode": "legacy_max",
+            "fast": False,
+            "wave_hypothesis": "air",
+            "forward_model": "native_interp",
+            "use_ssbvel": True,
+            "use_telluric_mask": True,
+            "teff0": 5500.0,
+            "feh0": -1.0,
+            "logg0": 3.0,
+            "rv0": -50.0,
+        }
+
+    elif preset == "pepsi_quicklook":
+        preset_values = {
+            "mode": "quicklook",
+            "wave_hypothesis": "air",
+            "forward_model": "native_interp",
+            "use_ssbvel": True,
+            "use_telluric_mask": True,
+        }
+
+    else:
+        raise ValueError("Unknown PEPSI preset: {0}".format(preset))
+
+    for dest, value in preset_values.items():
+        if not _flag_present(argv, dest):
+            setattr(args, dest, value)
+
+    return args
+    
+    
 def concat_with_gap(arrays, gap_value=np.nan, dtype=float):
     """
     Concatenate arrays with a single separator element between them.
@@ -576,6 +641,16 @@ def run_legacy_pepsi_fit(args, parser):
 
 def main():
     parser = build_parser()
+    parser.add_argument(
+        "--preset",
+        choices=["pepsi_quicklook", "pepsi_legacy_red_fast", "pepsi_legacy_red_full"],
+        default=None,
+        help=(
+            "Apply a named PEPSI preset. "
+            "Explicit CLI flags override preset values. "
+            "'pepsi_legacy_red_fast' is the recommended development regression preset."
+        ),
+    )
     parser.add_argument("files", nargs="+", help="Input PEPSI .dxt.nor file(s)")
     parser.add_argument(
         "--phoenix-dir",
@@ -690,7 +765,9 @@ def main():
     parser.add_argument("--legacy-maxiter", type=int, default=120, help="Maximum optimizer iterations in legacy mode")
     parser.add_argument("--cache-path", default=None, help="Interpolator cache path")
     parser.add_argument("--verbose", type=int, default=1)
+    raw_argv = sys.argv[1:]
     args = parser.parse_args()
+    args = apply_named_preset(args, raw_argv)
     
     if args.fast:
         args.teff_min = 5000.0
