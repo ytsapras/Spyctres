@@ -65,20 +65,42 @@ WINDOW_PRESETS = {
 def build_parser():
     return argparse.ArgumentParser(
         description=(
-            "Quick PHOENIX fit smoke test for reduced 1D PEPSI .dxt.nor spectra.\n"
-            "The default mode is a generic one-file quicklook fitter. For the "
-            "validated PEPSI red-line regression path, use --preset pepsi_legacy_red_fast."
+            "PEPSI PHOENIX fitting smoke test.\n"
+            "\n"
+            "This script has two roles:\n"
+            "  1. quicklook: a generic one-file PEPSI full-spectrum/window fit;\n"
+            "  2. legacy_max: a PEPSI line-window comparison mode that mimics the\n"
+            "     local model/max(model) normalization used in earlier PEPSI analysis.\n"
+            "\n"
+            "For normal development, prefer one of the named presets. Expert flags\n"
+            "remain available for diagnostics and sensitivity tests."
         ),
         epilog=(
-            "Examples:\n"
-            "  python scripts/pepsi_fit_smoketest.py --preset pepsi_legacy_red_fast \\\n"
-            "    examples/data/pepsir.20230603.009.dxt.nor \\\n"
-            "    examples/data/pepsir.20230603.010.dxt.nor\n\n"
-            "  python scripts/pepsi_fit_smoketest.py --preset pepsi_quicklook \\\n"
-            "    examples/data/pepsir.20230603.010.dxt.nor\n\n"
-            "  ~/.config/spyctres/config.toml:\n"
-            "    [paths]\n"
-            "    phoenix_dir = \"/path/to/PHOENIXv2\"\n"
+            "Recommended examples:\n"
+            "\n"
+            "  Fast PEPSI red-window regression test:\n"
+            "    python scripts/pepsi_fit_smoketest.py \\\n"
+            "      --preset pepsi_legacy_red_fast \\\n"
+            "      examples/data/pepsir.20230603.009.dxt.nor \\\n"
+            "      examples/data/pepsir.20230603.010.dxt.nor\n"
+            "\n"
+            "  Slower full-grid PEPSI red-window diagnostic:\n"
+            "    python scripts/pepsi_fit_smoketest.py \\\n"
+            "      --preset pepsi_legacy_red_full \\\n"
+            "      examples/data/pepsir.20230603.009.dxt.nor \\\n"
+            "      examples/data/pepsir.20230603.010.dxt.nor\n"
+            "\n"
+            "  One-file quicklook fit:\n"
+            "    python scripts/pepsi_fit_smoketest.py \\\n"
+            "      --preset pepsi_quicklook \\\n"
+            "      examples/data/pepsir.20230603.010.dxt.nor\n"
+            "\n"
+            "Configuration:\n"
+            "  export SPYCTRES_PHOENIX_DIR=/path/to/PHOENIXv2\n"
+            "\n"
+            "or use ~/.config/spyctres/config.toml:\n"
+            "  [paths]\n"
+            "  phoenix_dir = \"/path/to/PHOENIXv2\"\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -570,129 +592,223 @@ def run_legacy_pepsi_fit(args, parser):
 
 def main():
     parser = build_parser()
-    parser.add_argument(
+
+    standard = parser.add_argument_group("standard options")
+    expert = parser.add_argument_group("expert fitting controls")
+    legacy = parser.add_argument_group("legacy_max controls")
+    cache = parser.add_argument_group("cache and verbosity")
+
+    standard.add_argument("files", nargs="+", help="Input PEPSI .dxt.nor file(s)")
+    standard.add_argument(
         "--preset",
         choices=["pepsi_quicklook", "pepsi_legacy_red_fast", "pepsi_legacy_red_full"],
         default=None,
         help=(
-            "Apply a named PEPSI preset. Explicit CLI flags override preset values. "
-            "'pepsi_legacy_red_fast' is the recommended development regression preset."
+            "Apply a named PEPSI preset. "
+            "Recommended: pepsi_legacy_red_fast for development, "
+            "pepsi_legacy_red_full for a slower red-window diagnostic, "
+            "or pepsi_quicklook for a single-file generic fit. "
+            "Explicit CLI flags override preset values."
         ),
     )
-    parser.add_argument("files", nargs="+", help="Input PEPSI .dxt.nor file(s)")
-    parser.add_argument(
+    standard.add_argument(
         "--phoenix-dir",
         default=None,
-        help="Path to local PHOENIXv2 directory. Precedence: CLI > SPYCTRES_PHOENIX_DIR > config file.",
+        help=(
+            "Path to local PHOENIXv2 directory. "
+            "Precedence: CLI > SPYCTRES_PHOENIX_DIR > config file."
+        ),
     )
-    parser.add_argument(
+    standard.add_argument(
         "--mode",
         choices=["quicklook", "legacy_max"],
         default="quicklook",
-        help="Fit mode: generic quicklook fitter or PEPSI legacy-max comparison.",
+        help=(
+            "Fit mode. Use quicklook for a generic one-file PEPSI fit, "
+            "or legacy_max for the local line-window PEPSI comparison mode."
+        ),
     )
-    parser.add_argument(
+    standard.add_argument(
+        "--window-preset",
+        choices=["auto", "blue_balmer", "red_halpha", "red_metals", "caii_triplet"],
+        default="auto",
+        help="Window preset for quicklook mode.",
+    )
+    standard.add_argument(
+        "--window",
+        nargs=3,
+        action="append",
+        metavar=("LABEL", "WMIN", "WMAX"),
+        help="Custom quicklook fit window. Can be given multiple times.",
+    )
+    standard.add_argument(
+        "--use-telluric-mask",
+        action="store_true",
+        help="Apply Spyctres' built-in telluric mask.",
+    )
+    standard.add_argument(
+        "--use-ssbvel",
+        action="store_true",
+        help="Use header SSBVEL as a barycentric correction term.",
+    )
+    standard.add_argument(
+        "--fast",
+        action="store_true",
+        help=(
+            "Use a smaller PEPSI development grid and shorter optimization. "
+            "Intended for code testing, not final science results."
+        ),
+    )
+
+    expert.add_argument(
         "--wave-hypothesis",
         choices=["unknown", "air", "vacuum", "air_to_vac"],
         default="air",
         help="Observed wavelength-medium hypothesis.",
     )
-    parser.add_argument(
+    expert.add_argument(
         "--forward-model",
         choices=["interp_observed", "native_interp"],
         default="native_interp",
-        help="Forward-model path. For unknown wavelength medium, prefer native_interp.",
+        help=(
+            "Forward-model path. native_interp is the recommended path for "
+            "line-profile work."
+        ),
     )
-    parser.add_argument(
+    expert.add_argument(
         "--model-margin",
         type=float,
         default=20.0,
         help="Margin in Angstrom for native_interp model preparation.",
     )
-    parser.add_argument(
+    expert.add_argument(
         "--window-pad",
         type=float,
         default=2.0,
         help="Padding in Angstrom added around each PEPSI fit window.",
     )
-    parser.add_argument(
-        "--window-preset",
-        choices=["auto", "blue_balmer", "red_halpha", "red_metals", "caii_triplet"],
-        default="auto",
-        help="Window preset to use for PEPSI quicklook fitting.",
+    expert.add_argument(
+        "--R-override",
+        type=float,
+        default=None,
+        help="Override metadata resolving power R.",
     )
-    parser.add_argument(
-        "--window",
-        nargs=3,
-        action="append",
-        metavar=("LABEL", "WMIN", "WMAX"),
-        help="Custom fit window. Can be given multiple times.",
+    expert.add_argument(
+        "--teff-min",
+        type=float,
+        default=4500.0,
+        help="Minimum Teff for explicit PHOENIX grid.",
     )
-    parser.add_argument(
-        "--use-telluric-mask",
-        action="store_true",
-        help="Apply built-in telluric mask.",
+    expert.add_argument(
+        "--teff-max",
+        type=float,
+        default=12000.0,
+        help="Maximum Teff for explicit PHOENIX grid.",
     )
-    parser.add_argument(
+    expert.add_argument(
+        "--feh-min",
+        type=float,
+        default=-1.5,
+        help="Minimum [Fe/H] for explicit PHOENIX grid.",
+    )
+    expert.add_argument(
+        "--feh-max",
+        type=float,
+        default=0.5,
+        help="Maximum [Fe/H] for explicit PHOENIX grid.",
+    )
+    expert.add_argument(
+        "--logg-min",
+        type=float,
+        default=2.5,
+        help="Minimum logg for explicit PHOENIX grid.",
+    )
+    expert.add_argument(
+        "--logg-max",
+        type=float,
+        default=5.5,
+        help="Maximum logg for explicit PHOENIX grid.",
+    )
+    expert.add_argument(
+        "--mdeg",
+        type=int,
+        default=1,
+        help="Legendre continuum degree for quicklook mode.",
+    )
+    expert.add_argument("--teff0", type=float, default=6500.0, help="Initial Teff.")
+    expert.add_argument("--feh0", type=float, default=-0.5, help="Initial [Fe/H].")
+    expert.add_argument("--logg0", type=float, default=4.0, help="Initial logg.")
+    expert.add_argument("--rv0", type=float, default=0.0, help="Initial stellar RV in km/s.")
+    expert.add_argument(
+        "--rv-init",
+        choices=["grid", "none"],
+        default="grid",
+        help="RV initialization strategy.",
+    )
+    expert.add_argument(
+        "--rv-grid-n",
+        type=int,
+        default=161,
+        help="Number of trial RV points in coarse RV scan.",
+    )
+    expert.add_argument("--rv-min", type=float, default=-300.0, help="Minimum RV in km/s.")
+    expert.add_argument("--rv-max", type=float, default=300.0, help="Maximum RV in km/s.")
+    expert.add_argument(
         "--telluric-threshold",
         type=float,
         default=0.90,
         help="Telluric mask threshold.",
     )
-    parser.add_argument(
-        "--use-ssbvel",
-        action="store_true",
-        help="Use header SSBVEL as a barycentric correction term in km/s.",
-    )
-    parser.add_argument(
-        "--fast",
-        action="store_true",
-        help=(
-            "Use a smaller PEPSI development grid and shorter optimization. "
-            "This is intended for testing code paths, not final science results."
-        ),
-    )
-    parser.add_argument("--rv-min", type=float, default=-300.0, help="Minimum RV in km/s")
-    parser.add_argument("--rv-max", type=float, default=300.0, help="Maximum RV in km/s")
-    parser.add_argument(
-        "--legacy-log-scale-min",
-        type=float,
-        default=-2.0,
-        help="Minimum log10 error-scale in legacy mode",
-    )
-    parser.add_argument(
-        "--legacy-log-scale-max",
-        type=float,
-        default=2.0,
-        help="Maximum log10 error-scale in legacy mode",
-    )
-    parser.add_argument("--R-override", type=float, default=None, help="Override metadata resolving power R")
-    parser.add_argument("--teff-min", type=float, default=4500.0, help="Minimum Teff for explicit PHOENIX grid")
-    parser.add_argument("--teff-max", type=float, default=12000.0, help="Maximum Teff for explicit PHOENIX grid")
-    parser.add_argument("--feh-min", type=float, default=-1.5, help="Minimum [Fe/H] for explicit PHOENIX grid")
-    parser.add_argument("--feh-max", type=float, default=0.5, help="Maximum [Fe/H] for explicit PHOENIX grid")
-    parser.add_argument("--logg-min", type=float, default=2.5, help="Minimum logg for explicit PHOENIX grid")
-    parser.add_argument("--logg-max", type=float, default=5.5, help="Maximum logg for explicit PHOENIX grid")
-    parser.add_argument("--mdeg", type=int, default=1, help="Legendre continuum degree")
-    parser.add_argument("--teff0", type=float, default=6500.0, help="Initial Teff")
-    parser.add_argument("--feh0", type=float, default=-0.5, help="Initial [Fe/H]")
-    parser.add_argument("--logg0", type=float, default=4.0, help="Initial logg")
-    parser.add_argument("--rv0", type=float, default=0.0, help="Initial stellar RV in km/s")
-    parser.add_argument("--rv-init", choices=["grid", "none"], default="grid", help="RV initialization strategy")
-    parser.add_argument("--rv-grid-n", type=int, default=161, help="Number of trial RV points in coarse RV scan")
-    parser.add_argument(
+
+    legacy.add_argument(
         "--legacy-centers",
         nargs="*",
         type=float,
         default=None,
-        help="Line centers in Angstrom for --mode legacy_max. Default: 6495 6545 6561 8498 8542 8662.",
+        help=(
+            "Line centers in Angstrom for --mode legacy_max. "
+            "Default: 6495 6545 6561 8498 8542 8662."
+        ),
     )
-    parser.add_argument("--legacy-halfwidth", type=float, default=10.0, help="Half-width in Angstrom for legacy windows")
-    parser.add_argument("--legacy-flux-min", type=float, default=0.2, help="Minimum normalized flux retained in legacy mode")
-    parser.add_argument("--legacy-flux-max", type=float, default=1.1, help="Maximum normalized flux retained in legacy mode")
-    parser.add_argument("--legacy-maxiter", type=int, default=120, help="Maximum optimizer iterations in legacy mode")
-    parser.add_argument("--cache-path", default=None, help="Interpolator cache path")
-    parser.add_argument("--verbose", type=int, default=1)
+    legacy.add_argument(
+        "--legacy-halfwidth",
+        type=float,
+        default=10.0,
+        help="Half-width in Angstrom for legacy windows.",
+    )
+    legacy.add_argument(
+        "--legacy-flux-min",
+        type=float,
+        default=0.2,
+        help="Minimum normalized flux retained in legacy mode.",
+    )
+    legacy.add_argument(
+        "--legacy-flux-max",
+        type=float,
+        default=1.1,
+        help="Maximum normalized flux retained in legacy mode.",
+    )
+    legacy.add_argument(
+        "--legacy-log-scale-min",
+        type=float,
+        default=-2.0,
+        help="Minimum log10 error-scale in legacy mode.",
+    )
+    legacy.add_argument(
+        "--legacy-log-scale-max",
+        type=float,
+        default=2.0,
+        help="Maximum log10 error-scale in legacy mode.",
+    )
+    legacy.add_argument(
+        "--legacy-maxiter",
+        type=int,
+        default=120,
+        help="Maximum optimizer iterations in legacy mode.",
+    )
+
+    cache.add_argument("--cache-path", default=None, help="Interpolator cache path.")
+    cache.add_argument("--verbose", type=int, default=1, help="Verbosity level.")
 
     raw_argv = sys.argv[1:]
     args = parser.parse_args()
