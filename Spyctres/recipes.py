@@ -19,7 +19,7 @@ strictly tied to one instrument even when some presets are X-SHOOTER-oriented.
 import numpy as np
 from scipy.optimize import least_squares
 
-from .io import SpectrumSegment
+from .io import SpectrumSegment, make_padded_window_segments
 from .waveutils import convert_wavelength_medium, C_KMS
 from .fitting import (
     build_effective_fit_mask,
@@ -1013,6 +1013,266 @@ def build_plot_models_for_segments(
     return model_full_list, coeffs_list, used_masks, excluded_masks
 
 
+PEPSI_LEGACY_CENTERS_AIR = [6495.0, 6545.0, 6561.0, 8498.0, 8542.0, 8662.0]
+
+
+def build_pepsi_legacy_windows(centers_air=None, halfwidth_A=10.0):
+    centers = PEPSI_LEGACY_CENTERS_AIR if centers_air is None else centers_air
+    out = []
+    for c in centers:
+        c = float(c)
+        out.append(("legacy_{0:.1f}".format(c), c - float(halfwidth_A), c + float(halfwidth_A)))
+    return out
+
+
+def convert_air_windows_to_medium(window_defs_air, to_medium):
+    to_medium = str(to_medium).strip().lower()
+
+    if to_medium in ("air", "unknown", ""):
+        return list(window_defs_air)
+
+    if to_medium != "vacuum":
+        raise ValueError("Unsupported wavelength medium: {0}".format(to_medium))
+
+    out = []
+    for label, wmin_air, wmax_air in window_defs_air:
+        w_air = np.array([float(wmin_air), float(wmax_air)], dtype=float)
+        w_new = convert_wavelength_medium(w_air, from_medium="air", to_medium="vacuum")
+        out.append((label, float(w_new[0]), float(w_new[1])))
+
+    return out
+
+
+def apply_pepsi_wave_hypothesis(seg, hypothesis):
+    hypothesis = str(hypothesis).strip().lower()
+
+    if hypothesis == "unknown":
+        meta = dict(seg.meta)
+        meta["wave_medium"] = "unknown"
+        return seg.copy(meta=meta, wave_medium="unknown", name=(seg.name or "seg") + "_unknown")
+
+    if hypothesis == "air":
+        meta = dict(seg.meta)
+        meta["wave_medium"] = "air"
+        return seg.copy(meta=meta, wave_medium="air", name=(seg.name or "seg") + "_air")
+
+    if hypothesis == "vacuum":
+        meta = dict(seg.meta)
+        meta["wave_medium"] = "vacuum"
+        return seg.copy(meta=meta, wave_medium="vacuum", name=(seg.name or "seg") + "_vacuum")
+
+    if hypothesis == "air_to_vac":
+        wave_new = convert_wavelength_medium(
+            np.asarray(seg.wave, dtype=float),
+            from_medium="air",
+            to_medium="vacuum",
+        )
+        meta = dict(seg.meta)
+        meta["wave_medium"] = "vacuum"
+        return seg.copy(
+            wave=wave_new,
+            meta=meta,
+            wave_medium="vacuum",
+            name=(seg.name or "seg") + "_air2vac",
+        ).sorted()
+
+    raise ValueError("Unknown wavelength hypothesis: {0}".format(hypothesis))
+
+
+def build_pepsi_normalized_mask(seg, flux_min=0.2, flux_max=1.1):
+    wave = np.asarray(seg.wave, dtype=float)
+    flux = np.asarray(seg.flux, dtype=float)
+
+    good = np.asarray(seg.mask, dtype=bool)
+    good &= np.isfinite(wave) & np.isfinite(flux)
+    good &= (flux > float(flux_min)) & (flux < float(flux_max))
+
+    if seg.err is not None:
+        err = np.asarray(seg.err, dtype=float)
+        good &= np.isfinite(err) & (err > 0)
+
+    return good
+    
+
+def build_pepsi_legacy_segments(
+    input_segments,
+    wave_hypothesis="air",
+    centers_air=None,
+    halfwidth_A=10.0,
+    flux_min=0.2,
+    flux_max=1.1,
+    window_pad_A=2.0,
+):
+    window_defs_air = build_pepsi_legacy_windows(
+        centers_air=centers_air,
+        halfwidth_A=halfwidth_A,
+    )
+
+    working_input_segments = []
+    fit_segments = []
+
+    for seg0 in input_segments:
+        legacy_mask = build_pepsi_normalized_mask(
+            seg0,
+            flux_min=flux_min,
+            flux_max=flux_max,
+        )
+        seg0 = seg0.copy(mask=legacy_mask)
+        seg = apply_pepsi_wave_hypothesis(seg0, wave_hypothesis)
+        working_input_segments.append(seg)
+
+        working_window_defs = convert_air_windows_to_medium(
+            window_defs_air,
+            to_medium=seg.wave_medium,
+        )
+
+        wlo = float(np.nanmin(seg.wave))
+        whi = float(np.nanmax(seg.wave))
+        present_defs = [
+            (label, wmin, wmax)
+            for label, wmin, wmax in working_window_defs
+            if (wmax >= wlo) and (wmin <= whi)
+        ]
+
+        if len(present_defs) == 0:
+            continue
+
+        seg_windows = make_padded_window_segments(
+            seg,
+            [(wmin, wmax) for _label, wmin, wmax in present_defs],
+            pad=window_pad_A,
+            name_prefix="line",
+        )
+
+        for sw, win_def in zip(seg_windows, present_defs):
+            sw.name = win_def[0]
+            sw.meta["source_file"] = seg.meta.get("source_file")
+            sw.meta["legacy_window_air"] = tuple(
+                x for x in next(w for w in window_defs_air if w[0] == win_def[0])
+            )
+            sw.meta["legacy_window_working"] = tuple(win_def)
+            sw.meta["legacy_window_medium"] = seg.wave_medium
+
+        fit_segments.extend(seg_windows)
+
+    if len(fit_segments) == 0:
+        raise ValueError("No PEPSI legacy line windows overlap the supplied segment(s).")
+
+    return working_input_segments, fit_segments, window_defs_air
+
+
+def make_pepsi_legacy_cache_support_segments(
+    input_segments,
+    window_defs_air,
+    window_pad_A=2.0,
+):
+    support_segments = []
+
+    for seg in input_segments:
+        working_window_defs = convert_air_windows_to_medium(
+            window_defs_air,
+            to_medium=seg.wave_medium,
+        )
+
+        wlo = float(np.nanmin(seg.wave))
+        whi = float(np.nanmax(seg.wave))
+
+        present_defs = [
+            (label, wmin, wmax)
+            for label, wmin, wmax in working_window_defs
+            if (wmax >= wlo) and (wmin <= whi)
+        ]
+
+        for label, wmin, wmax in present_defs:
+            keep = (
+                np.isfinite(seg.wave) &
+                (seg.wave >= float(wmin) - float(window_pad_A)) &
+                (seg.wave <= float(wmax) + float(window_pad_A))
+            )
+
+            if not np.any(keep):
+                continue
+
+            n_keep = int(np.sum(keep))
+            support_segments.append(
+                seg.copy(
+                    wave=seg.wave[keep],
+                    flux=np.ones(n_keep, dtype=float),
+                    err=np.ones(n_keep, dtype=float),
+                    mask=np.ones(n_keep, dtype=bool),
+                    meta=dict(seg.meta),
+                    name="cache_support_{0}".format(label),
+                )
+            )
+
+    if len(support_segments) == 0:
+        raise ValueError("No PEPSI legacy cache support windows overlap the supplied segment(s).")
+
+    return support_segments
+
+
+def segment_fwhm_kms_from_R(seg, R=None):
+    if R is None:
+        R = getattr(seg, "meta", {}).get("resolution_R", None)
+    if R is None:
+        return None
+    R = float(R)
+    if R <= 0:
+        return None
+    return C_KMS / R
+
+
+def ensure_phoenix_native_interpolator_for_segments(
+    segments,
+    phoenix_lib,
+    teff_grid,
+    feh_grid,
+    logg_grid,
+    cache_path=None,
+    model_margin_A=20.0,
+):
+    model_wave_grid, model_wave_medium = build_native_interp_wave_grid_for_segments(
+        segments=segments,
+        phoenix_lib=phoenix_lib,
+        model_margin_A=model_margin_A,
+    )
+
+    teff_grid = np.asarray(teff_grid, dtype=float)
+    feh_grid = np.asarray(feh_grid, dtype=float)
+    logg_grid = np.asarray(logg_grid, dtype=float)
+
+    need_rebuild = False
+    if phoenix_lib.wave is None or phoenix_lib._grid is None:
+        need_rebuild = True
+    elif (len(phoenix_lib.wave) != len(model_wave_grid)) or (
+        not np.allclose(phoenix_lib.wave, model_wave_grid, rtol=0.0, atol=0.0)
+    ):
+        need_rebuild = True
+    else:
+        tg, zg, gg = phoenix_lib._grid
+        if (
+            len(tg) != len(teff_grid) or
+            len(zg) != len(feh_grid) or
+            len(gg) != len(logg_grid) or
+            not np.allclose(tg, teff_grid, rtol=0.0, atol=0.0) or
+            not np.allclose(zg, feh_grid, rtol=0.0, atol=0.0) or
+            not np.allclose(gg, logg_grid, rtol=0.0, atol=0.0)
+        ):
+            need_rebuild = True
+
+    if need_rebuild:
+        phoenix_lib.build_interpolator(
+            observed_wave=model_wave_grid,
+            teff_grid=teff_grid,
+            feh_grid=feh_grid,
+            logg_grid=logg_grid,
+            cache_path=cache_path,
+            observed_wave_medium=model_wave_medium,
+        )
+
+    return model_wave_grid, model_wave_medium
+
+
 __all__ = [
     "BALMER_CENTERS_VAC",
     "XSHOOTER_BALMER_WINDOWS",
@@ -1027,4 +1287,13 @@ __all__ = [
     "make_balmer_core_exclude_mask",
     "fit_phoenix_sideband_symmetric",
     "build_plot_models_for_segments",
+    "PEPSI_LEGACY_CENTERS_AIR",
+    "build_pepsi_legacy_windows",
+    "convert_air_windows_to_medium",
+    "apply_pepsi_wave_hypothesis",
+    "build_pepsi_normalized_mask",
+    "build_pepsi_legacy_segments",
+    "make_pepsi_legacy_cache_support_segments",
+    "segment_fwhm_kms_from_R",
+    "ensure_phoenix_native_interpolator_for_segments",
 ]

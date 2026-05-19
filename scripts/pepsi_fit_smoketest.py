@@ -13,6 +13,7 @@ warnings.filterwarnings(
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 
 from Spyctres import Spyctres
 from Spyctres.config import load_user_config, get_config_value, resolve_setting
@@ -23,9 +24,16 @@ from Spyctres.fitting import (
     build_effective_fit_mask,
     reconstruct_phoenix_legendre_models_for_segments,
 )
-from Spyctres.waveutils import convert_wavelength_medium
 from Spyctres.plotting import plot_full_spectrum_fit
-
+from Spyctres.phoenix_forward import build_phoenix_native_models_for_segments
+from Spyctres.recipes import (
+    apply_pepsi_wave_hypothesis,
+    build_pepsi_normalized_mask,
+    build_pepsi_legacy_segments,
+    make_pepsi_legacy_cache_support_segments,
+    segment_fwhm_kms_from_R,
+    ensure_phoenix_native_interpolator_for_segments,
+)
 
 WINDOW_PRESETS = {
     "blue_balmer": [
@@ -49,8 +57,8 @@ WINDOW_PRESETS = {
         ("Mg I 8807", 8802.0, 8812.0),
     ],
 }
-
-
+ 
+    
 def pick_grid_range(grid, lo=None, hi=None):
     g = np.asarray(grid, dtype=float)
     m = np.ones_like(g, dtype=bool)
@@ -93,49 +101,6 @@ def build_parser():
     )
 
 
-def apply_wave_hypothesis(seg, hypothesis):
-    """
-    Build a PEPSI segment variant for a wavelength-medium hypothesis.
-
-    hypothesis:
-      - unknown    : leave wavelengths unchanged, wave_medium='unknown'
-      - air        : leave wavelengths unchanged, wave_medium='air'
-      - vacuum     : leave wavelengths unchanged, wave_medium='vacuum'
-      - air_to_vac : convert stored wavelengths from air to vacuum
-    """
-    if hypothesis == "unknown":
-        meta = dict(seg.meta)
-        meta["wave_medium"] = "unknown"
-        return seg.copy(meta=meta, wave_medium="unknown", name=(seg.name or "seg") + "_unknown")
-
-    if hypothesis == "air":
-        meta = dict(seg.meta)
-        meta["wave_medium"] = "air"
-        return seg.copy(meta=meta, wave_medium="air", name=(seg.name or "seg") + "_air")
-
-    if hypothesis == "vacuum":
-        meta = dict(seg.meta)
-        meta["wave_medium"] = "vacuum"
-        return seg.copy(meta=meta, wave_medium="vacuum", name=(seg.name or "seg") + "_vacuum")
-
-    if hypothesis == "air_to_vac":
-        wave_new = convert_wavelength_medium(
-            np.asarray(seg.wave, dtype=float),
-            from_medium="air",
-            to_medium="vacuum",
-        )
-        meta = dict(seg.meta)
-        meta["wave_medium"] = "vacuum"
-        return seg.copy(
-            wave=wave_new,
-            meta=meta,
-            wave_medium="vacuum",
-            name=(seg.name or "seg") + "_air2vac",
-        ).sorted()
-
-    raise ValueError("Unknown wave hypothesis: {0}".format(hypothesis))
-
-
 def choose_auto_window_preset(seg):
     wmin = float(np.nanmin(seg.wave))
     wmax = float(np.nanmax(seg.wave))
@@ -153,21 +118,6 @@ def choose_auto_window_preset(seg):
         "Could not infer an automatic PEPSI window preset from wavelength range "
         "[{0:.1f}, {1:.1f}] A.".format(wmin, wmax)
     )
-
-
-def build_pepsi_normalized_mask(seg, flux_min=0.2, flux_max=1.1):
-    wave = np.asarray(seg.wave, dtype=float)
-    flux = np.asarray(seg.flux, dtype=float)
-
-    good = np.asarray(seg.mask, dtype=bool)
-    good &= np.isfinite(wave) & np.isfinite(flux)
-    good &= (flux > float(flux_min)) & (flux < float(flux_max))
-
-    if seg.err is not None:
-        err = np.asarray(seg.err, dtype=float)
-        good &= np.isfinite(err) & (err > 0)
-
-    return good
     
     
 def parse_custom_windows(window_args):
@@ -225,15 +175,430 @@ def concat_bool_with_gap(arrays):
         if i < len(arrays) - 1:
             out.append(np.array([False], dtype=bool))
     return np.concatenate(out)
+    
 
+def _legacy_pepsi_evaluate_models(
+    phoenix_lib,
+    segments,
+    model_wave_grid,
+    model_wave_medium,
+    teff,
+    feh,
+    logg,
+    rv_kms,
+    rv_bary_kms,
+    R,
+    model_margin_A,
+):
+    template_flux = np.asarray(phoenix_lib.evaluate(teff, feh, logg), dtype=float)
+    segment_fwhm_kms = [segment_fwhm_kms_from_R(seg, R=R) for seg in segments]
+    return build_phoenix_native_models_for_segments(
+        segments=segments,
+        phoenix_wave_native=model_wave_grid,
+        template_flux_native=template_flux,
+        rv_kms=float(rv_kms),
+        rv_bary_kms=float(rv_bary_kms),
+        segment_fwhm_kms=segment_fwhm_kms,
+        phoenix_wave_medium=model_wave_medium,
+        model_margin_A=model_margin_A,
+        bounds_use_fit_mask=True,
+        extrapolate=True,
+    )
+
+
+def _legacy_pepsi_window_chi_terms(seg, model_full, log_err_scale=0.0):
+    """
+    Return likelihood terms for one window.
+
+    The model is normalized by its maximum on the used pixels in the window,
+    matching the old model/max(model) comparison. The errors are scaled by
+    10**log_err_scale and used as variances in a Gaussian negative log-likelihood.
+    """
+    wave = np.asarray(seg.wave, dtype=float)
+    flux = np.asarray(seg.flux, dtype=float)
+    err = np.asarray(seg.err, dtype=float)
+    model_full = np.asarray(model_full, dtype=float)
+    used = np.asarray(seg.mask, dtype=bool)
+    used &= np.isfinite(wave) & np.isfinite(flux) & np.isfinite(err) & (err > 0)
+    used &= np.isfinite(model_full)
+
+    if np.sum(used) < 4:
+        return np.inf, 0, np.full_like(model_full, np.nan, dtype=float), used
+
+    mmax = float(np.nanmax(model_full[used]))
+    if (not np.isfinite(mmax)) or mmax == 0.0:
+        return np.inf, 0, np.full_like(model_full, np.nan, dtype=float), used
+
+    model_norm = model_full / mmax
+    sigma = (10.0 ** float(log_err_scale)) * err[used]
+    var = sigma * sigma
+    resid = flux[used] - model_norm[used]
+    nll_terms = resid * resid / var + np.log(2.0 * np.pi * var)
+    return float(np.sum(nll_terms)), int(np.sum(used)), model_norm, used
+
+
+def run_legacy_pepsi_fit(args, parser):
+    """
+    Run the PEPSI legacy-max comparison fit.
+
+    This remains a script-level driver:
+      - read PEPSI files
+      - apply CLI choices
+      - call reusable recipe helpers for segment/window/cache setup
+      - run the current legacy objective
+      - print and plot diagnostics
+
+    The PEPSI-specific segment/window/cache-support construction lives in
+    Spyctres.recipes, not in this script.
+    """
+    if args.forward_model != "native_interp":
+        parser.error("--mode legacy_max currently requires --forward-model native_interp.")
+
+    files = list(args.files)
+    for path in files:
+        if not os.path.isfile(path):
+            parser.error("Input file not found: {0}".format(path))
+
+    if args.phoenix_dir is None:
+        parser.error(
+            "No PHOENIX directory supplied. Set --phoenix-dir, SPYCTRES_PHOENIX_DIR, "
+            "or [paths].phoenix_dir in ~/.config/spyctres/config.toml."
+        )
+
+    if not os.path.isdir(args.phoenix_dir):
+        parser.error("PHOENIX directory not found: {0}".format(args.phoenix_dir))
+
+    # Read raw PEPSI segments once. Preserve source_file in metadata so the
+    # recipe-built window segments can carry it through to diagnostics.
+    raw_segments = []
+    for path in files:
+        seg = read_spectrum(path, instrument="pepsi")
+        meta = dict(seg.meta)
+        meta["source_file"] = path
+        raw_segments.append(seg.copy(meta=meta))
+
+    centers_air = args.legacy_centers
+
+    input_segments, segments, window_defs = build_pepsi_legacy_segments(
+        raw_segments,
+        wave_hypothesis=args.wave_hypothesis,
+        centers_air=centers_air,
+        halfwidth_A=args.legacy_halfwidth,
+        flux_min=args.legacy_flux_min,
+        flux_max=args.legacy_flux_max,
+        window_pad_A=args.window_pad,
+    )
+
+    if args.use_telluric_mask:
+        _, telluric_mask = Spyctres.load_telluric_lines(args.telluric_threshold)
+
+        def exclude_mask(wave):
+            return np.asarray(telluric_mask(wave)) > 0.5
+
+        # Fold tellurics into the segment masks once. The legacy objective then
+        # only needs seg.mask and does not need to know about tellurics.
+        segments = [
+            seg.copy(mask=np.asarray(seg.mask, dtype=bool) & ~exclude_mask(seg.wave))
+            for seg in segments
+        ]
+
+    phoenix_lib = PhoenixLibrary(args.phoenix_dir, verbose=bool(args.verbose))
+
+    teff_avail, feh_avail, logg_avail = phoenix_lib.available_axes()
+    teff_grid_req = pick_grid_range(teff_avail, args.teff_min, args.teff_max)
+    feh_grid_req = pick_grid_range(feh_avail, args.feh_min, args.feh_max)
+    logg_grid_req = pick_grid_range(logg_avail, args.logg_min, args.logg_max)
+
+    teff_grid_fit, feh_grid_fit, logg_grid_fit = phoenix_lib.complete_subgrid(
+        teff_grid_req,
+        feh_grid_req,
+        logg_grid_req,
+    )
+
+    rv_bary_values = []
+    for seg in input_segments:
+        ssbvel_mps = seg.meta.get("ssbvel_mps")
+        if args.use_ssbvel and ssbvel_mps is not None:
+            rv_bary_values.append(1.0e-3 * float(ssbvel_mps))
+
+    rv_bary_kms = float(np.nanmedian(rv_bary_values)) if rv_bary_values else 0.0
+
+    R = args.R_override
+    if R is None:
+        r_vals = [seg.meta.get("resolution_R", None) for seg in input_segments]
+        r_vals = [float(x) for x in r_vals if x is not None]
+        R = float(np.nanmedian(r_vals)) if r_vals else None
+
+    if args.cache_path is None:
+        names = "_".join(os.path.basename(p).replace(".", "_") for p in files)
+        if len(names) > 80:
+            names = "legacy_pepsi_joint"
+
+        speed_tag = "fast" if args.fast else "full"
+        args.cache_path = "/tmp/spyctres_{0}_{1}_{2}_legacy_cache.npz".format(
+            names,
+            args.wave_hypothesis,
+            speed_tag,
+        )
+
+    cache_support_segments = make_pepsi_legacy_cache_support_segments(
+        input_segments=input_segments,
+        window_defs_air=window_defs,
+        window_pad_A=args.window_pad,
+    )
+
+    model_wave_grid, model_wave_medium = ensure_phoenix_native_interpolator_for_segments(
+        segments=cache_support_segments,
+        phoenix_lib=phoenix_lib,
+        teff_grid=teff_grid_fit,
+        feh_grid=feh_grid_fit,
+        logg_grid=logg_grid_fit,
+        cache_path=args.cache_path,
+        model_margin_A=args.model_margin,
+    )
+
+    lo = np.array(
+        [
+            np.min(teff_grid_fit),
+            np.min(feh_grid_fit),
+            np.min(logg_grid_fit),
+            float(args.rv_min),
+            float(args.legacy_log_scale_min),
+        ],
+        dtype=float,
+    )
+
+    hi = np.array(
+        [
+            np.max(teff_grid_fit),
+            np.max(feh_grid_fit),
+            np.max(logg_grid_fit),
+            float(args.rv_max),
+            float(args.legacy_log_scale_max),
+        ],
+        dtype=float,
+    )
+
+    x0 = np.array(
+        [args.teff0, args.feh0, args.logg0, args.rv0, 0.0],
+        dtype=float,
+    )
+    x0 = np.minimum(np.maximum(x0, lo), hi)
+
+    def objective(x):
+        teff, feh, logg, rv, log_scale = map(float, x)
+
+        try:
+            models = _legacy_pepsi_evaluate_models(
+                phoenix_lib=phoenix_lib,
+                segments=segments,
+                model_wave_grid=model_wave_grid,
+                model_wave_medium=model_wave_medium,
+                teff=teff,
+                feh=feh,
+                logg=logg,
+                rv_kms=rv,
+                rv_bary_kms=rv_bary_kms,
+                R=R,
+                model_margin_A=args.model_margin,
+            )
+        except Exception:
+            return 1.0e100
+
+        total = 0.0
+        n_total = 0
+
+        for seg, model in zip(segments, models):
+            val, n, _model_norm, _used = _legacy_pepsi_window_chi_terms(
+                seg,
+                model,
+                log_err_scale=log_scale,
+            )
+
+            if not np.isfinite(val):
+                return 1.0e100
+
+            total += val
+            n_total += n
+
+        if n_total == 0:
+            return 1.0e100
+
+        return total
+
+    # Coarse RV seeding at the initial atmospheric parameters.
+    if args.rv_init != "none":
+        rv_grid = np.linspace(float(args.rv_min), float(args.rv_max), int(args.rv_grid_n))
+        vals = []
+
+        for rv in rv_grid:
+            xt = x0.copy()
+            xt[3] = rv
+            vals.append(objective(xt))
+
+        ibest = int(np.nanargmin(vals))
+        x0[3] = float(rv_grid[ibest])
+        print("Legacy RV init grid best:", x0[3])
+
+    res = minimize(
+        objective,
+        x0,
+        method="L-BFGS-B",
+        bounds=list(zip(lo, hi)),
+        options={
+            "maxiter": int(args.legacy_maxiter),
+            "ftol": 1e-8,
+        },
+    )
+
+    teff, feh, logg, rv, log_scale = map(float, res.x)
+
+    best_models_raw = _legacy_pepsi_evaluate_models(
+        phoenix_lib=phoenix_lib,
+        segments=segments,
+        model_wave_grid=model_wave_grid,
+        model_wave_medium=model_wave_medium,
+        teff=teff,
+        feh=feh,
+        logg=logg,
+        rv_kms=rv,
+        rv_bary_kms=rv_bary_kms,
+        R=R,
+        model_margin_A=args.model_margin,
+    )
+
+    model_norm_list = []
+    used_masks = []
+    chi2 = 0.0
+    npts = 0
+
+    for seg, model in zip(segments, best_models_raw):
+        _nll, n, model_norm, used = _legacy_pepsi_window_chi_terms(
+            seg,
+            model,
+            log_err_scale=log_scale,
+        )
+
+        e = np.asarray(seg.err, dtype=float)[used] * (10.0 ** log_scale)
+        r = (np.asarray(seg.flux, dtype=float)[used] - model_norm[used]) / e
+
+        chi2 += float(np.sum(r * r))
+        npts += int(n)
+        model_norm_list.append(model_norm)
+        used_masks.append(used)
+
+    dof = max(1, npts - 5)
+    chi2_red = chi2 / dof
+
+    print("Mode: legacy_max")
+    print("Files:")
+    for path in files:
+        print(" ", path)
+
+    print("Wave medium hypothesis:", args.wave_hypothesis)
+    print("Barycorr used [km/s]:", rv_bary_kms)
+    print("Telluric mask:", bool(args.use_telluric_mask))
+    print("R used:", R)
+    print("Legacy flux range:", (args.legacy_flux_min, args.legacy_flux_max))
+
+    print("Legacy windows defined in air:")
+    for label, wmin, wmax in window_defs:
+        print(" ", label, (wmin, wmax))
+
+    print("Windows actually fitted:")
+    for seg in segments:
+        working = seg.meta.get("legacy_window_working", None)
+        medium = seg.meta.get("legacy_window_medium", seg.wave_medium)
+
+        extra = ""
+        if working is not None:
+            extra = " working_window_{0}={1}".format(medium, working[1:])
+
+        print(
+            " ",
+            seg.name,
+            "from",
+            os.path.basename(str(seg.meta.get("source_file", ""))),
+            "N=",
+            int(np.sum(seg.mask)),
+            extra,
+        )
+
+    print("Best-fit:")
+    print("  Teff   =", teff)
+    print("  [Fe/H] =", feh)
+    print("  logg   =", logg)
+    print("  RV     =", rv)
+    print("  log10 error scale =", log_scale)
+    print("  error scale =", 10.0 ** log_scale)
+    print("  nll    =", float(res.fun))
+    print("  chi2   =", chi2)
+    print("  dof    =", dof)
+    print("  chi2_red =", chi2_red)
+    print("  success  =", bool(res.success))
+    print("  message  =", res.message)
+
+    wave_plot = concat_with_gap(
+        [seg.wave for seg in segments],
+        gap_value=np.nan,
+        dtype=float,
+    )
+    flux_plot = concat_with_gap(
+        [seg.flux for seg in segments],
+        gap_value=np.nan,
+        dtype=float,
+    )
+    err_plot = concat_with_gap(
+        [seg.err * (10.0 ** log_scale) for seg in segments],
+        gap_value=np.nan,
+        dtype=float,
+    )
+    model_plot = concat_with_gap(
+        model_norm_list,
+        gap_value=np.nan,
+        dtype=float,
+    )
+    used_plot = concat_bool_with_gap(used_masks)
+    excl_plot = np.zeros_like(used_plot, dtype=bool)
+
+    title = (
+        "PEPSI legacy_max {0}  Teff={1:.0f}  [Fe/H]={2:.2f}  "
+        "logg={3:.2f}  RV={4:.1f}  chi2_red={5:.2f}".format(
+            args.wave_hypothesis,
+            teff,
+            feh,
+            logg,
+            rv,
+            chi2_red,
+        )
+    )
+
+    fig, axes = plot_full_spectrum_fit(
+        wave=wave_plot,
+        flux=flux_plot,
+        err=err_plot,
+        model=model_plot,
+        used_mask=used_plot,
+        excluded_mask=excl_plot,
+        title=title,
+        line_groups=None,
+    )
+    plt.show()
+    
 
 def main():
     parser = build_parser()
-    parser.add_argument("file", help="Input PEPSI .dxt.nor file")
+    parser.add_argument("files", nargs="+", help="Input PEPSI .dxt.nor file(s)")
     parser.add_argument(
         "--phoenix-dir",
         default=None,
         help="Path to local PHOENIXv2 directory. Precedence: CLI > SPYCTRES_PHOENIX_DIR > config file.",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["quicklook", "legacy_max"],
+        default="quicklook",
+        help="Fit mode: generic quicklook fitter or PEPSI legacy-max comparison.",
     )
     parser.add_argument(
         "--wave-hypothesis",
@@ -288,6 +653,28 @@ def main():
         action="store_true",
         help="Use header SSBVEL as a barycentric correction term in km/s.",
     )
+    parser.add_argument(
+    "--fast",
+    action="store_true",
+    help=(
+        "Use a smaller PEPSI development grid and shorter optimization. "
+        "This is intended for testing code paths, not final science results."
+         ),
+    )
+    parser.add_argument("--rv-min", type=float, default=-300.0, help="Minimum RV in km/s")
+    parser.add_argument("--rv-max", type=float, default=300.0, help="Maximum RV in km/s")
+    parser.add_argument(
+        "--legacy-log-scale-min",
+        type=float,
+        default=-2.0,
+        help="Minimum log10 error-scale in legacy mode",
+    )
+    parser.add_argument(
+        "--legacy-log-scale-max",
+        type=float,
+        default=2.0,
+        help="Maximum log10 error-scale in legacy mode",
+    )
     parser.add_argument("--R-override", type=float, default=None, help="Override metadata resolving power R")
     parser.add_argument("--teff-min", type=float, default=4500.0, help="Minimum Teff for explicit PHOENIX grid")
     parser.add_argument("--teff-max", type=float, default=12000.0, help="Maximum Teff for explicit PHOENIX grid")
@@ -302,10 +689,46 @@ def main():
     parser.add_argument("--rv0", type=float, default=0.0, help="Initial stellar RV in km/s")
     parser.add_argument("--rv-init", choices=["grid", "none"], default="grid", help="RV initialization strategy")
     parser.add_argument("--rv-grid-n", type=int, default=161, help="Number of trial RV points in coarse RV scan")
+    parser.add_argument(
+        "--legacy-centers",
+        nargs="*",
+        type=float,
+        default=None,
+        help="Line centers in Angstrom for --mode legacy_max. Default: 6495 6545 6561 8498 8542 8662.",
+    )
+    parser.add_argument("--legacy-halfwidth", type=float, default=10.0, help="Half-width in Angstrom for legacy windows")
+    parser.add_argument("--legacy-flux-min", type=float, default=0.2, help="Minimum normalized flux retained in legacy mode")
+    parser.add_argument("--legacy-flux-max", type=float, default=1.1, help="Maximum normalized flux retained in legacy mode")
+    parser.add_argument("--legacy-maxiter", type=int, default=120, help="Maximum optimizer iterations in legacy mode")
     parser.add_argument("--cache-path", default=None, help="Interpolator cache path")
     parser.add_argument("--verbose", type=int, default=1)
     args = parser.parse_args()
+    
+    if args.fast:
+        args.teff_min = 5000.0
+        args.teff_max = 6000.0
 
+        # Keep the metallicity/logg space broad enough not to force edge solutions.
+        args.feh_min = -1.5
+        args.feh_max = 0.5
+        args.logg_min = 2.5
+        args.logg_max = 4.0
+
+        # The PEPSI red solution with SSBVEL is near -49 km/s.
+        # This prevents the optimizer from escaping to the pathological -250 km/s branch.
+        if args.rv0 != 0.0:
+            args.rv_min = max(float(args.rv_min), float(args.rv0) - 75.0)
+            args.rv_max = min(float(args.rv_max), float(args.rv0) + 75.0)
+
+        args.rv_grid_n = min(int(args.rv_grid_n), 41)
+        args.legacy_maxiter = min(int(args.legacy_maxiter), 50)
+
+        # The good PEPSI solution has error scale ~5.8, log10 ~0.77.
+        # The bad fast solution inflated this to ~17, log10 ~1.23.
+        args.legacy_log_scale_max = min(float(args.legacy_log_scale_max), 1.0)
+
+        args.verbose = 0
+        
     config = load_user_config()
     phoenix_dir_cfg = get_config_value(config, "paths", "phoenix_dir", default=None)
 
@@ -315,6 +738,15 @@ def main():
         config_value=phoenix_dir_cfg,
         default=None,
     )
+
+    if args.mode == "legacy_max":
+        run_legacy_pepsi_fit(args, parser)
+        return
+
+    if len(args.files) != 1:
+        parser.error("quicklook mode accepts exactly one PEPSI file. Use --mode legacy_max for joint fits.")
+
+    args.file = args.files[0]
 
     if not os.path.isfile(args.file):
         parser.error("Input file not found: {0}".format(args.file))
@@ -336,7 +768,7 @@ def main():
 
     seg0 = read_spectrum(args.file, instrument="pepsi")
     seg0 = seg0.copy(mask=build_pepsi_normalized_mask(seg0))
-    seg = apply_wave_hypothesis(seg0, args.wave_hypothesis)
+    seg = apply_pepsi_wave_hypothesis(seg0, args.wave_hypothesis)
 
     if args.window is not None:
         window_defs = parse_custom_windows(args.window)
