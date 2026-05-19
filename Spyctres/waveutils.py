@@ -64,6 +64,59 @@ def shift_wavelength_velocity(wave, v_kms):
     return wave * doppler_factor(v_kms)
 
 
+
+def resample_flux_with_velocity_shift_observed_grid(wave, flux, rv_kms):
+    """
+    Apply an RV shift to a model already sampled on the observed wavelength grid.
+
+    Convention
+    ----------
+    Positive ``rv_kms`` redshifts template/model features. The returned flux is
+    evaluated on the original input wavelength grid. This helper is intended for
+    observed-grid PHOENIX fitting paths and deliberately does not modify the
+    legacy ``Spyctres.velocity_correction`` convention.
+
+    Notes
+    -----
+    If the rest-frame model is sampled as ``flux(wave_rest)``, then a positive
+    radial velocity gives ``wave_obs = wave_rest * doppler_factor(rv_kms)``.
+    Therefore, to return model flux on a fixed observed wavelength grid, we
+    sample the rest-frame model at ``wave / doppler_factor(rv_kms)``.
+    """
+    from scipy.interpolate import interp1d
+
+    wave = _as_float_array(wave)
+    flux = _as_float_array(flux)
+
+    if wave.shape != flux.shape:
+        raise ValueError("wave and flux must have the same shape.")
+
+    if wave.ndim != 1:
+        raise ValueError("wave and flux must be 1D arrays.")
+
+    good = np.isfinite(wave) & np.isfinite(flux)
+    if np.sum(good) < 2:
+        return np.full_like(wave, np.nan, dtype=float)
+
+    w = wave[good]
+    f = flux[good]
+
+    if not np.all(np.diff(w) > 0):
+        idx = np.argsort(w)
+        w = w[idx]
+        f = f[idx]
+
+    sample_wave = wave / doppler_factor(float(rv_kms))
+
+    interpolator = interp1d(
+        w,
+        f,
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
+    )
+    return np.asarray(interpolator(sample_wave), dtype=float)
+
 def _ciddor_factor_from_vacuum_angstrom(wave_vac):
     """
     Refractive index factor f = lambda_vac / lambda_air

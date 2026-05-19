@@ -3,11 +3,8 @@ import numpy as np
 from scipy.optimize import least_squares
 from numpy.polynomial.legendre import legvander
 
-# Legacy helper. Do not call directly inside PHOENIX fitting paths.
-# PHOENIX fitters use _apply_observed_grid_rv_shift() below so that
-# reported rv_kms follows the standard astronomical convention:
-# positive RV redshifts the template.
-from .Spyctres import velocity_correction
+# Observed-grid PHOENIX RV resampling is implemented in waveutils.py so that
+# this fitting layer does not import the legacy monolithic Spyctres.py module.
 from .io import SpectrumSegment, SpectrumCollection
 from .phoenix_forward import (
     infer_segments_wave_medium,
@@ -25,7 +22,7 @@ from .phoenix_forward import (
 # positive RV redshifts the template/model. Observed-grid PHOENIX paths must
 # call _apply_observed_grid_rv_shift(), not velocity_correction() directly.
 
-from .waveutils import C_KMS
+from .waveutils import C_KMS, resample_flux_with_velocity_shift_observed_grid
 
 
 def _coerce_segments_input(segments):
@@ -415,14 +412,15 @@ def _apply_observed_grid_rv_shift(wave, model_flux, rv_kms):
 
     Legacy compatibility
     --------------------
-    Spyctres.velocity_correction is part of the legacy public API and is left
-    unchanged. In this observed-grid template-resampling use case,
-    velocity_correction(+RV) shifts absorption features blueward. Therefore the
-    PHOENIX observed-grid branch calls it with -RV to preserve the standard
-    PHOENIX rv_kms convention without changing legacy Spyctres behavior.
+    This wrapper delegates to waveutils.py rather than importing the legacy
+    monolithic Spyctres.py module. The legacy Spyctres.velocity_correction()
+    public API remains unchanged.
     """
-    spec = np.c_[np.asarray(wave, dtype=float), np.asarray(model_flux, dtype=float)]
-    return velocity_correction(spec, -float(rv_kms))[:, 1]
+    return resample_flux_with_velocity_shift_observed_grid(
+        wave=wave,
+        flux=model_flux,
+        rv_kms=rv_kms,
+    )
     
     
 def _chi2_for_params(
