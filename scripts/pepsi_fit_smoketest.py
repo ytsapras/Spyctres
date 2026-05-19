@@ -1,7 +1,7 @@
 import os
+import sys
 import argparse
 import warnings
-import sys
 
 # pysynphot is legacy and emits a pkg_resources deprecation warning.
 # Suppress it in smoke-test scripts to keep output readable.
@@ -18,7 +18,7 @@ from scipy.optimize import minimize
 
 from Spyctres import Spyctres
 from Spyctres.config import load_user_config, get_config_value, resolve_setting
-from Spyctres.io import read_spectrum, make_padded_window_segments
+from Spyctres.io import read_spectrum, make_padded_window_segments, SpectrumCollection
 from Spyctres.phoenix import PhoenixLibrary
 from Spyctres.fitting import (
     fit_phoenix_full_spectrum,
@@ -26,18 +26,17 @@ from Spyctres.fitting import (
     reconstruct_phoenix_legendre_models_for_segments,
 )
 from Spyctres.plotting import plot_full_spectrum_fit
-from Spyctres.phoenix_forward import build_phoenix_native_models_for_segments
 from Spyctres.recipes import (
     apply_pepsi_wave_hypothesis,
     build_pepsi_normalized_mask,
     build_pepsi_legacy_segments,
     make_pepsi_legacy_cache_support_segments,
-    segment_fwhm_kms_from_R,
     ensure_phoenix_native_interpolator_for_segments,
     pick_grid_range,
     evaluate_pepsi_legacy_max_models,
     pepsi_legacy_max_likelihood_terms,
 )
+
 
 WINDOW_PRESETS = {
     "blue_balmer": [
@@ -66,24 +65,17 @@ WINDOW_PRESETS = {
 def build_parser():
     return argparse.ArgumentParser(
         description=(
-            "Quick PHOENIX fit smoke test for a reduced 1D PEPSI .dxt.nor spectrum.\n"
-            "This is a generic PEPSI quicklook fitter. It fits selected narrow windows\n"
-            "for one PEPSI segment, with optional telluric masking, optional use of\n"
-            "header SSBVEL as a barycentric correction, and configurable wavelength-medium\n"
-            "hypotheses."
+            "Quick PHOENIX fit smoke test for reduced 1D PEPSI .dxt.nor spectra.\n"
+            "The default mode is a generic one-file quicklook fitter. For the "
+            "validated PEPSI red-line regression path, use --preset pepsi_legacy_red_fast."
         ),
         epilog=(
             "Examples:\n"
-            "  python scripts/pepsi_fit_smoketest.py /path/to/pepsib.20230603.014.dxt.nor\n\n"
-            "  python scripts/pepsi_fit_smoketest.py \\\n"
-            "    --window-preset blue_balmer \\\n"
-            "    --wave-hypothesis air \\\n"
-            "    --use-telluric-mask \\\n"
-            "    /path/to/pepsib.20230603.014.dxt.nor\n\n"
-            "  python scripts/pepsi_fit_smoketest.py \\\n"
-            "    --window 'LineA' 6432 6447 \\\n"
-            "    --window 'LineB' 6488 6502 \\\n"
-            "    /path/to/pepsir.20230603.009.dxt.nor\n\n"
+            "  python scripts/pepsi_fit_smoketest.py --preset pepsi_legacy_red_fast \\\n"
+            "    examples/data/pepsir.20230603.009.dxt.nor \\\n"
+            "    examples/data/pepsir.20230603.010.dxt.nor\n\n"
+            "  python scripts/pepsi_fit_smoketest.py --preset pepsi_quicklook \\\n"
+            "    examples/data/pepsir.20230603.010.dxt.nor\n\n"
             "  ~/.config/spyctres/config.toml:\n"
             "    [paths]\n"
             "    phoenix_dir = \"/path/to/PHOENIXv2\"\n"
@@ -109,12 +101,10 @@ def choose_auto_window_preset(seg):
         "Could not infer an automatic PEPSI window preset from wavelength range "
         "[{0:.1f}, {1:.1f}] A.".format(wmin, wmax)
     )
-    
-    
+
+
 def parse_custom_windows(window_args):
-    """
-    Parse repeated --window LABEL WMIN WMAX arguments.
-    """
+    """Parse repeated --window LABEL WMIN WMAX arguments."""
     out = []
     for item in window_args:
         if len(item) != 3:
@@ -135,6 +125,7 @@ def build_window_segments(seg, window_defs, pad=2.0):
         seg_i.name = label
     return segments
 
+
 def _flag_present(argv, dest):
     """
     Return True if the corresponding CLI flag was explicitly given.
@@ -146,9 +137,7 @@ def _flag_present(argv, dest):
 
 
 def apply_named_preset(args, argv):
-    """
-    Apply a named PEPSI fitting preset, while keeping explicit CLI flags in control.
-    """
+    """Apply a named PEPSI fitting preset, while keeping explicit CLI flags in control."""
     preset = getattr(args, "preset", None)
     if preset is None:
         return args
@@ -166,7 +155,6 @@ def apply_named_preset(args, argv):
             "logg0": 3.0,
             "rv0": -50.0,
         }
-
     elif preset == "pepsi_legacy_red_full":
         preset_values = {
             "mode": "legacy_max",
@@ -180,7 +168,6 @@ def apply_named_preset(args, argv):
             "logg0": 3.0,
             "rv0": -50.0,
         }
-
     elif preset == "pepsi_quicklook":
         preset_values = {
             "mode": "quicklook",
@@ -189,7 +176,6 @@ def apply_named_preset(args, argv):
             "use_ssbvel": True,
             "use_telluric_mask": True,
         }
-
     else:
         raise ValueError("Unknown PEPSI preset: {0}".format(preset))
 
@@ -198,12 +184,10 @@ def apply_named_preset(args, argv):
             setattr(args, dest, value)
 
     return args
-    
-    
+
+
 def concat_with_gap(arrays, gap_value=np.nan, dtype=float):
-    """
-    Concatenate arrays with a single separator element between them.
-    """
+    """Concatenate arrays with a single separator element between them."""
     arrays = [np.asarray(a, dtype=dtype) for a in arrays]
     if len(arrays) == 0:
         return np.array([], dtype=dtype)
@@ -217,9 +201,7 @@ def concat_with_gap(arrays, gap_value=np.nan, dtype=float):
 
 
 def concat_bool_with_gap(arrays):
-    """
-    Concatenate boolean arrays with a False separator between windows.
-    """
+    """Concatenate boolean arrays with a False separator between windows."""
     arrays = [np.asarray(a, dtype=bool) for a in arrays]
     if len(arrays) == 0:
         return np.array([], dtype=bool)
@@ -232,19 +214,39 @@ def concat_bool_with_gap(arrays):
     return np.concatenate(out)
 
 
+def _make_unit_collection(segments, window_defs, args):
+    """
+    Wrap PEPSI legacy line-window segments in a SpectrumCollection.
+
+    The current PEPSI legacy fit uses unit weights, preserving the previous
+    list-based behavior. The collection wrapper gives us the same abstraction
+    used by the generic fitter and leaves a clean place for future per-window or
+    per-arm weights.
+    """
+    weights = np.ones(len(segments), dtype=float)
+    return SpectrumCollection(
+        segments=segments,
+        weights=weights,
+        meta={
+            "instrument": "PEPSI",
+            "mode": "legacy_max",
+            "wave_hypothesis": args.wave_hypothesis,
+            "legacy_windows_air": list(window_defs),
+            "legacy_flux_range": (float(args.legacy_flux_min), float(args.legacy_flux_max)),
+        },
+        name="pepsi_legacy_windows",
+    )
+
+
 def run_legacy_pepsi_fit(args, parser):
     """
     Run the PEPSI legacy-max comparison fit.
 
-    This remains a script-level driver:
-      - read PEPSI files
-      - apply CLI choices
-      - call reusable recipe helpers for segment/window/cache setup
-      - run the current legacy objective
-      - print and plot diagnostics
-
-    The PEPSI-specific segment/window/cache-support construction lives in
-    Spyctres.recipes, not in this script.
+    This remains a script-level driver. The reusable PEPSI-specific
+    segment/window/cache-support construction and legacy likelihood pieces live
+    in Spyctres.recipes. The fitted line windows are wrapped in a
+    SpectrumCollection so the joint fit has the same container abstraction as the
+    generic full-spectrum fitter.
     """
     if args.forward_model != "native_interp":
         parser.error("--mode legacy_max currently requires --forward-model native_interp.")
@@ -263,8 +265,6 @@ def run_legacy_pepsi_fit(args, parser):
     if not os.path.isdir(args.phoenix_dir):
         parser.error("PHOENIX directory not found: {0}".format(args.phoenix_dir))
 
-    # Read raw PEPSI segments once. Preserve source_file in metadata so the
-    # recipe-built window segments can carry it through to diagnostics.
     raw_segments = []
     for path in files:
         seg = read_spectrum(path, instrument="pepsi")
@@ -272,12 +272,10 @@ def run_legacy_pepsi_fit(args, parser):
         meta["source_file"] = path
         raw_segments.append(seg.copy(meta=meta))
 
-    centers_air = args.legacy_centers
-
     input_segments, segments, window_defs = build_pepsi_legacy_segments(
         raw_segments,
         wave_hypothesis=args.wave_hypothesis,
-        centers_air=centers_air,
+        centers_air=args.legacy_centers,
         halfwidth_A=args.legacy_halfwidth,
         flux_min=args.legacy_flux_min,
         flux_max=args.legacy_flux_max,
@@ -290,12 +288,14 @@ def run_legacy_pepsi_fit(args, parser):
         def exclude_mask(wave):
             return np.asarray(telluric_mask(wave)) > 0.5
 
-        # Fold tellurics into the segment masks once. The legacy objective then
-        # only needs seg.mask and does not need to know about tellurics.
         segments = [
             seg.copy(mask=np.asarray(seg.mask, dtype=bool) & ~exclude_mask(seg.wave))
             for seg in segments
         ]
+
+    collection = _make_unit_collection(segments, window_defs, args)
+    segments = list(collection.segments)
+    segment_weights = np.asarray(collection.weights, dtype=float)
 
     phoenix_lib = PhoenixLibrary(args.phoenix_dir, verbose=bool(args.verbose))
 
@@ -403,7 +403,7 @@ def run_legacy_pepsi_fit(args, parser):
         total = 0.0
         n_total = 0
 
-        for seg, model in zip(segments, models):
+        for seg, weight, model in zip(segments, segment_weights, models):
             val, n, _model_norm, _used = pepsi_legacy_max_likelihood_terms(
                 seg,
                 model,
@@ -413,15 +413,14 @@ def run_legacy_pepsi_fit(args, parser):
             if not np.isfinite(val):
                 return 1.0e100
 
-            total += val
-            n_total += n
+            total += float(weight) * float(val)
+            n_total += int(n)
 
         if n_total == 0:
             return 1.0e100
 
         return total
 
-    # Coarse RV seeding at the initial atmospheric parameters.
     if args.rv_init != "none":
         rv_grid = np.linspace(float(args.rv_min), float(args.rv_max), int(args.rv_grid_n))
         vals = []
@@ -467,7 +466,7 @@ def run_legacy_pepsi_fit(args, parser):
     chi2 = 0.0
     npts = 0
 
-    for seg, model in zip(segments, best_models_raw):
+    for seg, weight, model in zip(segments, segment_weights, best_models_raw):
         _nll, n, model_norm, used = pepsi_legacy_max_likelihood_terms(
             seg,
             model,
@@ -477,7 +476,7 @@ def run_legacy_pepsi_fit(args, parser):
         e = np.asarray(seg.err, dtype=float)[used] * (10.0 ** log_scale)
         r = (np.asarray(seg.flux, dtype=float)[used] - model_norm[used]) / e
 
-        chi2 += float(np.sum(r * r))
+        chi2 += float(weight) * float(np.sum(r * r))
         npts += int(n)
         model_norm_list.append(model_norm)
         used_masks.append(used)
@@ -486,6 +485,8 @@ def run_legacy_pepsi_fit(args, parser):
     chi2_red = chi2 / dof
 
     print("Mode: legacy_max")
+    print("Collection:", collection.name)
+    print("Collection segments:", len(collection.segments))
     print("Files:")
     for path in files:
         print(" ", path)
@@ -501,7 +502,7 @@ def run_legacy_pepsi_fit(args, parser):
         print(" ", label, (wmin, wmax))
 
     print("Windows actually fitted:")
-    for seg in segments:
+    for seg, weight in zip(segments, segment_weights):
         working = seg.meta.get("legacy_window_working", None)
         medium = seg.meta.get("legacy_window_medium", seg.wave_medium)
 
@@ -516,6 +517,8 @@ def run_legacy_pepsi_fit(args, parser):
             os.path.basename(str(seg.meta.get("source_file", ""))),
             "N=",
             int(np.sum(seg.mask)),
+            "weight=",
+            float(weight),
             extra,
         )
 
@@ -533,26 +536,10 @@ def run_legacy_pepsi_fit(args, parser):
     print("  success  =", bool(res.success))
     print("  message  =", res.message)
 
-    wave_plot = concat_with_gap(
-        [seg.wave for seg in segments],
-        gap_value=np.nan,
-        dtype=float,
-    )
-    flux_plot = concat_with_gap(
-        [seg.flux for seg in segments],
-        gap_value=np.nan,
-        dtype=float,
-    )
-    err_plot = concat_with_gap(
-        [seg.err * (10.0 ** log_scale) for seg in segments],
-        gap_value=np.nan,
-        dtype=float,
-    )
-    model_plot = concat_with_gap(
-        model_norm_list,
-        gap_value=np.nan,
-        dtype=float,
-    )
+    wave_plot = concat_with_gap([seg.wave for seg in segments], gap_value=np.nan, dtype=float)
+    flux_plot = concat_with_gap([seg.flux for seg in segments], gap_value=np.nan, dtype=float)
+    err_plot = concat_with_gap([seg.err * (10.0 ** log_scale) for seg in segments], gap_value=np.nan, dtype=float)
+    model_plot = concat_with_gap(model_norm_list, gap_value=np.nan, dtype=float)
     used_plot = concat_bool_with_gap(used_masks)
     excl_plot = np.zeros_like(used_plot, dtype=bool)
 
@@ -579,7 +566,7 @@ def run_legacy_pepsi_fit(args, parser):
         line_groups=None,
     )
     plt.show()
-    
+
 
 def main():
     parser = build_parser()
@@ -588,8 +575,7 @@ def main():
         choices=["pepsi_quicklook", "pepsi_legacy_red_fast", "pepsi_legacy_red_full"],
         default=None,
         help=(
-            "Apply a named PEPSI preset. "
-            "Explicit CLI flags override preset values. "
+            "Apply a named PEPSI preset. Explicit CLI flags override preset values. "
             "'pepsi_legacy_red_fast' is the recommended development regression preset."
         ),
     )
@@ -659,12 +645,12 @@ def main():
         help="Use header SSBVEL as a barycentric correction term in km/s.",
     )
     parser.add_argument(
-    "--fast",
-    action="store_true",
-    help=(
-        "Use a smaller PEPSI development grid and shorter optimization. "
-        "This is intended for testing code paths, not final science results."
-         ),
+        "--fast",
+        action="store_true",
+        help=(
+            "Use a smaller PEPSI development grid and shorter optimization. "
+            "This is intended for testing code paths, not final science results."
+        ),
     )
     parser.add_argument("--rv-min", type=float, default=-300.0, help="Minimum RV in km/s")
     parser.add_argument("--rv-max", type=float, default=300.0, help="Maximum RV in km/s")
@@ -707,35 +693,28 @@ def main():
     parser.add_argument("--legacy-maxiter", type=int, default=120, help="Maximum optimizer iterations in legacy mode")
     parser.add_argument("--cache-path", default=None, help="Interpolator cache path")
     parser.add_argument("--verbose", type=int, default=1)
+
     raw_argv = sys.argv[1:]
     args = parser.parse_args()
     args = apply_named_preset(args, raw_argv)
-    
+
     if args.fast:
         args.teff_min = 5000.0
         args.teff_max = 6000.0
-
-        # Keep the metallicity/logg space broad enough not to force edge solutions.
         args.feh_min = -1.5
         args.feh_max = 0.5
         args.logg_min = 2.5
         args.logg_max = 4.0
 
-        # The PEPSI red solution with SSBVEL is near -49 km/s.
-        # This prevents the optimizer from escaping to the pathological -250 km/s branch.
         if args.rv0 != 0.0:
             args.rv_min = max(float(args.rv_min), float(args.rv0) - 75.0)
             args.rv_max = min(float(args.rv_max), float(args.rv0) + 75.0)
 
         args.rv_grid_n = min(int(args.rv_grid_n), 41)
         args.legacy_maxiter = min(int(args.legacy_maxiter), 50)
-
-        # The good PEPSI solution has error scale ~5.8, log10 ~0.77.
-        # The bad fast solution inflated this to ~17, log10 ~1.23.
         args.legacy_log_scale_max = min(float(args.legacy_log_scale_max), 1.0)
-
         args.verbose = min(int(args.verbose), 1)
-        
+
     config = load_user_config()
     phoenix_dir_cfg = get_config_value(config, "paths", "phoenix_dir", default=None)
 
