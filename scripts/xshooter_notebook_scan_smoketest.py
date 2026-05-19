@@ -19,6 +19,7 @@ from Spyctres.Spyctres import load_telluric_lines
 from Spyctres.config import load_user_config, get_config_value, resolve_setting
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
+from Spyctres.recipes import pick_grid_range
 
 C_KMS = 299792.458
 
@@ -281,19 +282,6 @@ def build_excluded_mask(seg, exclude_mask=None):
     if exclude_mask is not None:
         m |= (np.asarray(exclude_mask(seg.wave)) > 0.5)
     return m
-
-
-def pick_grid_range(grid, lo=None, hi=None):
-    g = np.asarray(grid, dtype=float)
-    m = np.ones_like(g, dtype=bool)
-    if lo is not None:
-        m &= (g >= float(lo))
-    if hi is not None:
-        m &= (g <= float(hi))
-    out = g[m]
-    if out.size == 0:
-        raise ValueError("Requested PHOENIX grid range is empty.")
-    return out
 
 
 def evaluate_template_on_segments(

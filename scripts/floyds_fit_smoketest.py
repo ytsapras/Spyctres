@@ -22,19 +22,7 @@ from Spyctres.fitting import (
     reconstruct_phoenix_legendre_models_for_segments,
 )
 from Spyctres.plotting import plot_full_spectrum_fit
-
-
-def pick_grid_range(grid, lo=None, hi=None):
-    g = np.asarray(grid, dtype=float)
-    m = np.ones_like(g, dtype=bool)
-    if lo is not None:
-        m &= (g >= float(lo))
-    if hi is not None:
-        m &= (g <= float(hi))
-    out = g[m]
-    if out.size == 0:
-        raise ValueError("Requested PHOENIX grid range is empty.")
-    return out
+from Spyctres.recipes import pick_grid_range
 
 
 def build_parser():

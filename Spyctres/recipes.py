@@ -1271,6 +1271,19 @@ def ensure_phoenix_native_interpolator_for_segments(
     return model_wave_grid, model_wave_medium
 
 
+def pick_grid_range(grid, lo=None, hi=None):
+    g = np.asarray(grid, dtype=float)
+    m = np.ones_like(g, dtype=bool)
+    if lo is not None:
+        m &= (g >= float(lo))
+    if hi is not None:
+        m &= (g <= float(hi))
+    out = g[m]
+    if out.size == 0:
+        raise ValueError("Requested PHOENIX grid range is empty.")
+    return out
+    
+    
 __all__ = [
     "BALMER_CENTERS_VAC",
     "XSHOOTER_BALMER_WINDOWS",
@@ -1294,4 +1307,5 @@ __all__ = [
     "make_pepsi_legacy_cache_support_segments",
     "segment_fwhm_kms_from_R",
     "ensure_phoenix_native_interpolator_for_segments",
+    "pick_grid_range",
 ]

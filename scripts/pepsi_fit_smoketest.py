@@ -33,6 +33,7 @@ from Spyctres.recipes import (
     make_pepsi_legacy_cache_support_segments,
     segment_fwhm_kms_from_R,
     ensure_phoenix_native_interpolator_for_segments,
+    pick_grid_range,
 )
 
 WINDOW_PRESETS = {
@@ -57,19 +58,6 @@ WINDOW_PRESETS = {
         ("Mg I 8807", 8802.0, 8812.0),
     ],
 }
- 
-    
-def pick_grid_range(grid, lo=None, hi=None):
-    g = np.asarray(grid, dtype=float)
-    m = np.ones_like(g, dtype=bool)
-    if lo is not None:
-        m &= (g >= float(lo))
-    if hi is not None:
-        m &= (g <= float(hi))
-    out = g[m]
-    if out.size == 0:
-        raise ValueError("Requested PHOENIX grid range is empty.")
-    return out
 
 
 def build_parser():

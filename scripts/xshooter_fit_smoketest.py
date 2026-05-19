@@ -32,6 +32,7 @@ from Spyctres.recipes import (
     make_balmer_core_exclude_mask,
     fit_phoenix_sideband_symmetric,
     build_plot_models_for_segments,
+    pick_grid_range,
 )
 
 
@@ -90,19 +91,6 @@ def _window_annulus_rms(wave, z, center, inner_halfwidth=12.0, outer_halfwidth=3
     if np.sum(m) < 5:
         return np.nan
     return float(np.sqrt(np.mean(z[m] ** 2)))
-
-
-def pick_grid_range(grid, lo=None, hi=None):
-    g = np.asarray(grid, dtype=float)
-    m = np.ones_like(g, dtype=bool)
-    if lo is not None:
-        m &= (g >= float(lo))
-    if hi is not None:
-        m &= (g <= float(hi))
-    out = g[m]
-    if out.size == 0:
-        raise ValueError("Requested PHOENIX grid range is empty.")
-    return out
 
 
 def _dedupe_p0_list(starts):
