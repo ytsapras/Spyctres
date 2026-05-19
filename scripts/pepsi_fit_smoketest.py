@@ -727,7 +727,7 @@ def main():
         # The bad fast solution inflated this to ~17, log10 ~1.23.
         args.legacy_log_scale_max = min(float(args.legacy_log_scale_max), 1.0)
 
-        args.verbose = 0
+        args.verbose = min(int(args.verbose), 1)
         
     config = load_user_config()
     phoenix_dir_cfg = get_config_value(config, "paths", "phoenix_dir", default=None)

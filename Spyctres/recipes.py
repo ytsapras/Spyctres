@@ -33,8 +33,6 @@ from .fitting import (
 from .phoenix_forward import (
     build_phoenix_native_models_for_segments,
     infer_segments_wave_medium,
-    fit_bounds_from_segments,
-    prepare_phoenix_native_template,
     build_native_interp_wave_grid_for_segments,
 )
 
