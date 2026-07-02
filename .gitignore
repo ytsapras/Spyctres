@@ -7,8 +7,11 @@ __pycache__/
 build/
 dist/
 
+# IDE files
+.idea/
+
 # Notebooks
 .ipynb_checkpoints/
 
-# Files to ignore
+# Local development scripts
 scripts/phoenix_backend_compare.py

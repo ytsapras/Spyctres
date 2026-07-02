@@ -1,8 +1,10 @@
 # Spyctres
 
-Spyctres is a Python package for stellar spectral fitting and spectral typing from reduced spectra.
+Spyctres is a Python package for stellar spectral fitting and spectral typing from reduced spectra. It can compare a measured spectrum with publicly available spectral-template libraries to find the closest match.
 
-It includes core fitting utilities, instrument I/O helpers, plotting tools, and example workflows. Recent additions include support for PHOENIX template-based fitting and a clearer separation between generic fitting code, workflow recipes, examples, and smoke tests.
+Developer: Etienne Bachelet
+
+Spyctres is still under active development. It includes core fitting utilities, instrument I/O helpers, plotting tools, and example workflows. Recent additions include PHOENIX template-based fitting and a clearer separation between generic fitting code, workflow recipes, examples, and smoke tests.
 
 ## Features
 
@@ -16,7 +18,7 @@ It includes core fitting utilities, instrument I/O helpers, plotting tools, and 
 
 ## Installation
 
-Spyctres is currently intended for local editable installs during development.
+Spyctres is currently intended for local editable installs during development. Creating and activating a virtual environment first is recommended.
 
 ```bash
 git clone https://github.com/ebachelet/Spyctres.git
@@ -24,14 +26,27 @@ cd Spyctres
 pip install -e .
 ```
 
-Some workflows also require additional scientific Python dependencies and, for PHOENIX-based fitting, a local PHOENIX template directory. 
+Some legacy workflows use `pysynphot` and its successor package `stsynphot`:
 
-The PHOENIX templates may be downloaded from the Göttingen Spectral Library:
+```bash
+pip install pysynphot stsynphot
+```
+
+Those workflows also require the stellar template libraries linked from the [pysynphot installation documentation](https://pysynphot.readthedocs.io/en/latest/index.html#pysynphot-installation-setup). After downloading and unpacking them, set `PYSYN_CDBS` to their local root directory:
+
+```bash
+export PYSYN_CDBS=/path/to/cdbs
+```
+
+PHOENIX workflows require additional scientific Python dependencies and a local PHOENIX template directory.
+
+The PHOENIX templates may be downloaded from the Goettingen Spectral Library:
+
 - PHOENIX archive: `https://phoenix.astro.physik.uni-goettingen.de/`
 - PHOENIX v2 HiResFITS directory: `https://phoenix.astro.physik.uni-goettingen.de/data/v2.0/HiResFITS/PHOENIX-ACES-AGSS-COND-2011/`
 - PHOENIX v2 wavelength file: `https://phoenix.astro.physik.uni-goettingen.de/data/v2.0/HiResFITS/WAVE_PHOENIX-ACES-AGSS-COND-2011.fits`
 
-The wavelength file for the Phoenix model has to be placed in the root folder of the PHOENIXv2 models.
+The wavelength file must be placed in the root directory of the PHOENIX v2 models.
 
 ## PHOENIX template path
 
@@ -52,8 +67,8 @@ phoenix_dir = "/path/to/PHOENIXv2"
 
 Useful entry points in the repository include:
 
-- `quick_example.py`
-- `examples/full_spectrum_classification.ipynb`
+- `quick_example.py` for the legacy fitting workflow
+- `examples/full_spectrum_classification.ipynb` for PHOENIX classification
 - smoke tests under `scripts/`
 
 To open the PHOENIX example notebook:
