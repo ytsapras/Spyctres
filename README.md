@@ -20,6 +20,8 @@ Spyctres is still under active development. It includes core fitting utilities, 
 
 Spyctres is currently intended for local editable installs during development. Creating and activating a virtual environment first is recommended.
 
+Spyctres requires Python 3.12 or later.
+
 ```bash
 git clone https://github.com/ebachelet/Spyctres.git
 cd Spyctres
