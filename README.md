@@ -673,7 +673,10 @@ directly to `mdeg`. The result's
 `diagnostics["continuum_model"]["segments"]` block reports the evaluated pivot
 factor, slope, curvature, range, and weighted residual contribution for each
 segment. These are nuisance-model diagnostics, not a physical cross-arm flux
-calibration or SED measurement. `SpectrumCollection.weights` change each
+calibration or SED measurement. In particular, the absolute pivot factor can
+be arbitrarily small or large when observed and model flux normalizations use
+different scales; continuum shape and controlled relative comparisons are the
+relevant checks. `SpectrumCollection.weights` change each
 segment's likelihood contribution; they are not display tapers or arm scales.
 
 X-SHOOTER dichroic regions are also explicit rather than reader defaults.

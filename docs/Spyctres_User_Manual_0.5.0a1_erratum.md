@@ -69,8 +69,10 @@ factor range, and weighted residual contribution are evaluated from the full
 polynomial. Individual Legendre coefficients should not be interpreted as
 physical arm scales, particularly for degree 2 and above. These polynomials
 correct continuum/model mismatch and do not determine an absolute SED or
-angular radius. Collection weights alter the statistical likelihood; they are
-not flux-calibration factors.
+angular radius. The absolute pivot factor is allowed to absorb arbitrary
+observed/model flux normalization; scale-invariant shape excursions and
+controlled relative-arm comparisons are more informative. Collection weights
+alter the statistical likelihood; they are not flux-calibration factors.
 
 The X-SHOOTER UVB/VIS and VIS/NIR dichroic regions are product-specific and are
 not silently masked by readers. Use:

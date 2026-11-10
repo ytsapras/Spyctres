@@ -828,8 +828,9 @@ QUALITY_FLAG_DESCRIPTIONS = {
         "over its fitted pixels; inspect calibration, masking, and model mismatch."
     ),
     "continuum_pivot_scale_extreme": (
-        "At least one per-segment continuum pivot factor lies outside 0.1-10; "
-        "this is a diagnostic correction, not a validated arm calibration."
+        "A legacy diagnostic found a continuum pivot factor outside 0.1-10. "
+        "An absolute pivot scale may be arbitrary when data and model flux "
+        "normalizations differ, so this flag alone does not indicate a bad fit."
     ),
     "xshooter_dichroic_frame_conservative": (
         "An X-SHOOTER dichroic mask used a conservative velocity envelope "
@@ -1083,11 +1084,11 @@ QUALITY_FLAG_CLASSIFICATION = {
         ),
     },
     "continuum_pivot_scale_extreme": {
-        "severity": "review",
+        "severity": "info",
         "category": "continuum",
         "action": (
-            "Review input flux scaling and report this only as a nuisance "
-            "model correction, not physical SED calibration."
+            "Record the input/model flux units and prefer scale-invariant "
+            "continuum excursions or validated relative-arm comparisons."
         ),
     },
     "xshooter_dichroic_frame_conservative": {
@@ -1637,6 +1638,25 @@ def build_fit_quality_report(summary, diagnostics=None, quality_flags=None):
     segments = []
     for segment in diagnostics.get("segment_diagnostics", []):
         mask_summary = dict(segment.get("mask_summary", {}))
+        explicit_inside_count = mask_summary.get(
+            "n_rejected_by_explicit_union_inside_fit_window"
+        )
+        if explicit_inside_count is None:
+            explicit_inside_count = max(
+                0,
+                int(mask_summary.get("n_rejected_by_explicit_union", 0))
+                - int(mask_summary.get("n_outside_fit_window", 0)),
+            )
+        explicit_inside_fraction = mask_summary.get(
+            "explicit_exclusion_inside_fit_window_fraction"
+        )
+        if explicit_inside_fraction is None:
+            n_inside = int(mask_summary.get("n_inside_fit_window", 0))
+            explicit_inside_fraction = (
+                None
+                if n_inside <= 0
+                else float(explicit_inside_count / float(n_inside))
+            )
         segments.append(
             {
                 "name": segment.get("name"),
@@ -1652,12 +1672,8 @@ def build_fit_quality_report(summary, diagnostics=None, quality_flags=None):
                     "rejected_inside_fit_window_fraction",
                     mask_summary.get("rejected_inside_fit_window_fraction"),
                 ),
-                "explicit_exclusion_count": mask_summary.get(
-                    "n_rejected_by_explicit_union"
-                ),
-                "explicit_exclusion_fraction": mask_summary.get(
-                    "explicit_exclusion_fraction"
-                ),
+                "explicit_exclusion_count": explicit_inside_count,
+                "explicit_exclusion_fraction": explicit_inside_fraction,
                 "data_invalid_count": mask_summary.get(
                     "n_rejected_by_data_invalid"
                 ),

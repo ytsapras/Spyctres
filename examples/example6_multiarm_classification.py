@@ -303,6 +303,51 @@ def _print_classification_window_rows(collection, windows):
     return rows
 
 
+def _print_continuum_diagnostics(result):
+    """Print scale-aware per-segment continuum and likelihood diagnostics."""
+    segment_diagnostics = result.diagnostics.get("segment_diagnostics", [])
+    if not segment_diagnostics:
+        return
+
+    def formatted(value, spec):
+        if value is None or not np.isfinite(float(value)):
+            return "n/a"
+        return format(float(value), spec)
+
+    print("\nPer-retained-segment continuum diagnostics:", flush=True)
+    for index, segment in enumerate(segment_diagnostics):
+        continuum = segment.get("continuum") or {}
+        if not continuum:
+            continue
+        name = segment.get("name") or "segment_{0}".format(index)
+        warnings = ",".join(continuum.get("warning_flags") or []) or "none"
+        print(
+            "  {0}: pivot={1}; dlnC/dlnλ={2}; curvature={3}; "
+            "factor_range={4}-{5}; weighted_chi2_share={6}; "
+            "weighted_invvar_share={7}; warnings={8}".format(
+                name,
+                formatted(continuum.get("pivot_factor"), ".4e"),
+                formatted(continuum.get("log_slope_at_pivot"), ".4g"),
+                formatted(continuum.get("log_curvature_at_pivot"), ".4g"),
+                formatted(continuum.get("factor_min"), ".4e"),
+                formatted(continuum.get("factor_max"), ".4e"),
+                formatted(continuum.get("weighted_chi2_fraction"), ".1%"),
+                formatted(
+                    continuum.get("weighted_inverse_variance_fraction"),
+                    ".1%",
+                ),
+                warnings,
+            ),
+            flush=True,
+        )
+    print(
+        "  Absolute pivot factors absorb the arbitrary data/model flux scale; "
+        "inspect continuum shape and controlled relative-arm comparisons, not "
+        "the absolute coefficient alone.",
+        flush=True,
+    )
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
     if args.allow_exploratory_fit and not str(args.override_reason or "").strip():
@@ -543,6 +588,7 @@ def main(argv=None):
         )
         print(result.summary_text(include_hash=False, max_flags=8), flush=True)
         print("\n" + result.quality_report_text(), flush=True)
+        _print_continuum_diagnostics(result)
 
         sp.plot_fit_referee(
             result,

@@ -824,6 +824,10 @@ def test_fit_mask_summary_splits_window_trimming_from_inside_rejections():
     assert summary["n_inside_fit_window"] == 3
     assert summary["n_rejected_inside_fit_window"] == 1
     assert summary["rejected_inside_fit_window_fraction"] == pytest.approx(1.0 / 3.0)
+    assert summary["n_rejected_by_explicit_union_inside_fit_window"] == 1
+    assert summary["explicit_exclusion_inside_fit_window_fraction"] == pytest.approx(
+        1.0 / 3.0
+    )
     assert summary["rejected_fraction"] == pytest.approx(3.0 / 5.0)
 
 

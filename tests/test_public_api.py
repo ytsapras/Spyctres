@@ -128,6 +128,12 @@ def test_structured_result_quality_report_summarizes_fit_selection():
                         "rejected_inside_fit_window_fraction": np.float64(0.34375),
                         "n_rejected_by_explicit_union": np.int64(10),
                         "explicit_exclusion_fraction": np.float64(0.125),
+                        "n_rejected_by_explicit_union_inside_fit_window": np.int64(
+                            10
+                        ),
+                        "explicit_exclusion_inside_fit_window_fraction": np.float64(
+                            0.15625
+                        ),
                         "n_rejected_by_data_invalid": np.int64(4),
                         "data_invalid_fraction": np.float64(0.05),
                         "n_rejected_by_multiple_reasons": np.int64(2),
@@ -159,7 +165,7 @@ def test_structured_result_quality_report_summarizes_fit_selection():
     assert report["segments"][0]["outside_fit_window_fraction"] == 0.20
     assert report["segments"][0]["rejected_inside_fit_window_fraction"] == 0.34375
     assert report["segments"][0]["explicit_exclusion_count"] == 10
-    assert report["segments"][0]["explicit_exclusion_fraction"] == 0.125
+    assert report["segments"][0]["explicit_exclusion_fraction"] == 0.15625
     assert report["segments"][0]["data_invalid_count"] == 4
     assert report["segments"][0]["data_invalid_fraction"] == 0.05
     assert report["segments"][0]["multiple_rejection_count"] == 2

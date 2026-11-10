@@ -1790,6 +1790,9 @@ class MaskResult:
         counts["n_rejected_inside_fit_window"] = int(
             np.count_nonzero(inside_regions & self.fit_rejection_mask)
         )
+        counts["n_rejected_by_explicit_union_inside_fit_window"] = int(
+            np.count_nonzero(inside_regions & self.explicit_exclusion_mask)
+        )
         return counts
 
     def to_metadata(self, label="fit_mask"):
@@ -1828,6 +1831,15 @@ class MaskResult:
                 0.0
                 if counts["n_inside_fit_window"] <= 0
                 else counts["n_rejected_inside_fit_window"]
+                / float(counts["n_inside_fit_window"])
+            ),
+            "n_rejected_by_explicit_union_inside_fit_window": int(
+                counts["n_rejected_by_explicit_union_inside_fit_window"]
+            ),
+            "explicit_exclusion_inside_fit_window_fraction": float(
+                0.0
+                if counts["n_inside_fit_window"] <= 0
+                else counts["n_rejected_by_explicit_union_inside_fit_window"]
                 / float(counts["n_inside_fit_window"])
             ),
             "n_rejected_by_data_invalid": int(counts["n_rejected_by_data_invalid"]),

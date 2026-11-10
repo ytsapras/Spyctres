@@ -1765,8 +1765,25 @@ def _phoenix_quality_flags(diagnostics, success=True, high_chi2_threshold=5.0):
         for segment in segment_diagnostics
     ):
         flags.append("segment_mask_fraction_high")
+
+    def _explicit_rejections_inside_fit_window(segment):
+        summary = segment.get("mask_summary", {})
+        direct = summary.get(
+            "n_rejected_by_explicit_union_inside_fit_window"
+        )
+        if direct is not None:
+            return int(direct)
+        # The explicit union includes every pixel outside `regions`. For
+        # diagnostics written before the dedicated in-window count existed,
+        # subtracting that window trim recovers the relevant exclusion count.
+        return max(
+            0,
+            int(summary.get("n_rejected_by_explicit_union", 0))
+            - int(summary.get("n_outside_fit_window", 0)),
+        )
+
     if any(
-        int(segment.get("mask_summary", {}).get("n_rejected_by_explicit_union", 0))
+        _explicit_rejections_inside_fit_window(segment)
         > int(segment.get("mask_summary", {}).get("n_fit", 0))
         for segment in segment_diagnostics
     ):
@@ -2330,11 +2347,6 @@ def _legendre_continuum_diagnostics(wave_ref, coeffs, wave_eval=None):
         flags.append("continuum_nonpositive")
     if dynamic_range is not None and dynamic_range > 10.0:
         flags.append("continuum_large_excursion")
-    if np.isfinite(pivot_factor) and (
-        pivot_factor < 0.1 or pivot_factor > 10.0
-    ):
-        flags.append("continuum_pivot_scale_extreme")
-
     return {
         "degree": int(coeffs.size - 1),
         "coefficients": coeffs.tolist(),

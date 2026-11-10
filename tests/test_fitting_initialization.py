@@ -357,6 +357,13 @@ def test_legendre_continuum_diagnostics_evaluate_full_polynomial_at_pivot():
     )
     assert diagnostics["warning_flags"] == []
 
+    arbitrary_scale = _legendre_continuum_diagnostics(
+        np.linspace(5000.0, 5100.0, 11),
+        np.array([1.0e-25]),
+    )
+    assert arbitrary_scale["pivot_factor"] == pytest.approx(1.0e-25)
+    assert arbitrary_scale["warning_flags"] == []
+
 
 def test_joint_fit_recovers_independent_scale_and_slope_for_each_segment():
     class ConstantLibrary:
@@ -928,6 +935,7 @@ def test_quality_flags_include_mask_derived_warnings():
                 "mask_summary": {
                     "n_fit": 12,
                     "n_rejected_by_explicit_union": 20,
+                    "n_rejected_by_explicit_union_inside_fit_window": 20,
                 },
                 "mask_provenance": {
                     "counts": {"nonfinite_mask_output": 1},
@@ -950,6 +958,38 @@ def test_quality_flags_include_mask_derived_warnings():
     assert "nonfinite_mask_output" in flags
     assert "telluric_mask_frame_ambiguous" in flags
     assert "coarse_telluric_mask_applied" in flags
+
+
+def test_quality_flags_do_not_treat_fit_window_trimming_as_explicit_rejection():
+    diagnostics = {
+        "reduced_chi2": 1.0,
+        "n_parameters": 4,
+        "n_dropped_segments": 0,
+        "mask_fraction": 0.9,
+        "rejected_inside_fit_window_fraction": 0.05,
+        "grid_edge_flags": {},
+        "wavelength_metadata_summary": {},
+        "resolution_metadata_summary": {"missing_count": 0},
+        "segment_diagnostics": [
+            {
+                "n_fit": 12,
+                "mask_fraction": 0.9,
+                "rejected_inside_fit_window_fraction": 0.05,
+                "mask_summary": {
+                    "n_fit": 12,
+                    "n_outside_fit_window": 100,
+                    "n_rejected_by_explicit_union": 101,
+                    "n_rejected_by_explicit_union_inside_fit_window": 1,
+                },
+            }
+        ],
+    }
+
+    flags = _phoenix_quality_flags(diagnostics, success=True)
+
+    assert "mask_fraction_high" not in flags
+    assert "segment_mask_fraction_high" not in flags
+    assert "explicit_exclusion_dominates" not in flags
 
 
 def test_quality_flags_include_robust_loss_and_error_floor_warnings():
