@@ -13,9 +13,11 @@ from Spyctres.fitting import (
     _full_spectrum_parameter_count,
     _grid_edge_flags,
     _make_forward_segments,
+    _legendre_continuum_diagnostics,
     _phoenix_quality_flags,
     _retained_segments_from_meta,
     _resolve_segment_fwhm_kms,
+    _solve_multiplicative_legendre,
     _velocity_convention_summary,
     fit_phoenix_full_spectrum,
     reconstruct_phoenix_legendre_models_for_segments,
@@ -303,7 +305,117 @@ def test_forward_segment_alignment_mismatch_is_rejected():
 
 
 def test_parameter_count_uses_only_retained_segments():
-    assert _full_spectrum_parameter_count(2, mdeg=2) == 10
+    assert [
+        _full_spectrum_parameter_count(2, mdeg=degree)
+        for degree in range(4)
+    ] == [6, 8, 10, 12]
+
+
+def test_legendre_solver_reuses_good_pixel_wavelength_normalization():
+    wave = np.arange(5.0)
+    model = np.ones(5)
+    err = np.ones(5)
+    # The fitted reference range is 1..3 because the flux is invalid at both
+    # edges. On that reference range, P(x) = 2 + 0.5 x.
+    flux = np.array([np.nan, 1.5, 2.0, 2.5, np.nan])
+
+    corrected, coeffs = _solve_multiplicative_legendre(
+        wave,
+        flux,
+        err,
+        model,
+        mdeg=1,
+    )
+
+    np.testing.assert_allclose(coeffs, [2.0, 0.5], rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        corrected,
+        [1.0, 1.5, 2.0, 2.5, 3.0],
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+def test_legendre_continuum_diagnostics_evaluate_full_polynomial_at_pivot():
+    diagnostics = _legendre_continuum_diagnostics(
+        np.linspace(5000.0, 5100.0, 11),
+        np.array([2.0, 0.1, 0.4]),
+    )
+
+    # L2(0) = -1/2, so c0 alone is not the continuum pivot factor.
+    assert diagnostics["pivot_factor"] == pytest.approx(1.8)
+    assert diagnostics["pivot_wave_A"] == pytest.approx(5050.0)
+    assert diagnostics["log_slope_at_pivot"] == pytest.approx(
+        5050.0 * 0.1 * 2.0 / 100.0 / 1.8
+    )
+    slope = diagnostics["log_slope_at_pivot"]
+    expected_second = (
+        5050.0**2 * (3.0 * 0.4) * (2.0 / 100.0) ** 2 / 1.8
+    )
+    assert diagnostics["log_curvature_at_pivot"] == pytest.approx(
+        slope + expected_second - slope**2
+    )
+    assert diagnostics["warning_flags"] == []
+
+
+def test_joint_fit_recovers_independent_scale_and_slope_for_each_segment():
+    class ConstantLibrary:
+        DEFAULT_TEFF_GRID = np.array([4999.0, 5000.0, 5001.0])
+        DEFAULT_FEH_GRID = np.array([-0.1, 0.0, 0.1])
+        DEFAULT_LOGG_GRID = np.array([3.9, 4.0, 4.1])
+
+        def __init__(self):
+            self._n_wave = None
+
+        def interpolator_matches(self, observed_wave, *args, **kwargs):
+            return self._n_wave == len(observed_wave)
+
+        def build_interpolator(self, observed_wave, *args, **kwargs):
+            self._n_wave = len(observed_wave)
+
+        def evaluate(self, teff, feh, logg):
+            return np.ones(self._n_wave, dtype=float)
+
+    wave_first = np.linspace(5000.0, 5010.0, 11)
+    wave_second = np.linspace(6000.0, 6020.0, 11)
+    x_first = 2.0 * (wave_first - wave_first.min()) / np.ptp(wave_first) - 1.0
+    x_second = 2.0 * (wave_second - wave_second.min()) / np.ptp(wave_second) - 1.0
+    collection = SpectrumCollection(
+        [
+            SpectrumSegment(
+                wave_first,
+                0.8 + 0.1 * x_first,
+                err=np.full(11, 0.02),
+                name="first",
+            ),
+            SpectrumSegment(
+                wave_second,
+                1.2 - 0.2 * x_second,
+                err=np.full(11, 0.02),
+                name="second",
+            ),
+        ]
+    )
+
+    result = fit_phoenix_full_spectrum(
+        collection,
+        phoenix_lib=ConstantLibrary(),
+        p0=(5000.0, 0.0, 4.0, 0.0),
+        bounds=((4999.0, -0.1, 3.9, -1.0), (5001.0, 0.1, 4.1, 1.0)),
+        mdeg=1,
+        rv_init=None,
+        multistart=1,
+        max_nfev=1,
+        forward_model="interp_observed",
+    )
+
+    continua = result["diagnostics"]["continuum_model"]["segments"]
+    np.testing.assert_allclose(continua[0]["coefficients"], [0.8, 0.1], atol=1e-12)
+    np.testing.assert_allclose(continua[1]["coefficients"], [1.2, -0.2], atol=1e-12)
+    assert continua[0]["pivot_factor"] == pytest.approx(0.8)
+    assert continua[1]["pivot_factor"] == pytest.approx(1.2)
+    assert result["diagnostics"]["n_parameters"] == 8
+    assert result["chi2"] < 1e-20
 
 
 def test_multisegment_weighted_chi2_and_dof_accounting():
@@ -371,6 +483,24 @@ def test_multisegment_weighted_chi2_and_dof_accounting():
     assert result["diagnostics"]["degrees_of_freedom"] == 4
     assert result["diagnostics"]["segment_diagnostics"][0]["n_fit"] == 5
     assert result["diagnostics"]["segment_diagnostics"][1]["weight"] == 4.0
+    continuum = result["diagnostics"]["continuum_model"]
+    assert continuum["type"] == "multiplicative_legendre_per_segment"
+    assert continuum["degree"] == 0
+    assert continuum["n_profiled_parameters"] == 2
+    assert continuum["segment_parameters_are_independent"] is True
+    assert len(continuum["segments"]) == 2
+    assert continuum["segments"][0]["pivot_factor"] == pytest.approx(1.0)
+    assert continuum["segments"][1]["pivot_factor"] == pytest.approx(1.0)
+    assert continuum["segments"][0]["chi2_weighted"] == pytest.approx(2.0)
+    assert continuum["segments"][1]["chi2_weighted"] == pytest.approx(8.0)
+    assert continuum["segments"][0]["weighted_chi2_fraction"] == pytest.approx(0.2)
+    assert continuum["segments"][1]["weighted_chi2_fraction"] == pytest.approx(0.8)
+    assert continuum["segments"][0][
+        "weighted_inverse_variance_fraction"
+    ] == pytest.approx(0.5)
+    assert result["diagnostics"]["segment_diagnostics"][0]["continuum"][
+        "pivot_factor"
+    ] == pytest.approx(1.0)
     assert result["quality_report"]["n_points"] == 10
     assert result["quality_report"]["degrees_of_freedom"] == 4
     assert result["quality_report"]["segments"][0]["n_fit"] == 5

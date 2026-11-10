@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 from scipy.optimize import least_squares
-from numpy.polynomial.legendre import legvander
+from numpy.polynomial.legendre import legder, legval, legvander
 
 # Observed-grid PHOENIX RV resampling is implemented in waveutils.py so that
 # this fitting layer does not import the legacy monolithic Spyctres.py module.
@@ -1402,6 +1402,7 @@ def _build_phoenix_fit_diagnostics(
     error_model="nominal",
     error_floor_applied=False,
     parameter_errors_available=None,
+    continuum_diagnostics=None,
 ):
     """Build a compact, JSON-safe diagnostics block for PHOENIX fits."""
     retained_count = int(len(seg_meta))
@@ -1455,6 +1456,11 @@ def _build_phoenix_fit_diagnostics(
         )
     )
 
+    continuum_diagnostics = list(continuum_diagnostics or ())
+    if continuum_diagnostics and len(continuum_diagnostics) != retained_count:
+        raise ValueError(
+            "continuum_diagnostics must align with retained fit segments."
+        )
     segment_diagnostics = []
     for index, meta in enumerate(seg_meta):
         n_support = int(meta.get("n_support", 0))
@@ -1468,41 +1474,38 @@ def _build_phoenix_fit_diagnostics(
             forward_segments[index],
             seg_fwhm,
         )
-        segment_diagnostics.append(
-            {
-                "name": meta.get("name"),
-                "input_index": int(meta.get("index", index)),
-                "weight": float(meta.get("weight", 1.0)),
-                "n_support": n_support,
-                "n_fit": n_fit,
-                "mask_fraction": (
-                    None if n_support <= 0 else float(1.0 - n_fit / float(n_support))
-                ),
-                "outside_fit_window_fraction": mask_summary.get(
-                    "outside_fit_window_fraction"
-                ),
-                "rejected_inside_fit_window_fraction": mask_summary.get(
-                    "rejected_inside_fit_window_fraction"
-                ),
-                "wave_min": meta.get("wave_min"),
-                "wave_max": meta.get("wave_max"),
-                "input_error_model": input_error_model,
-                "error_floor": error_floor,
-                "mask_summary": mask_summary,
-                "mask_provenance": mask_provenance,
-                "lsf_fwhm_kms": (
-                    None
-                    if seg_fwhm is None
-                    else float(seg_fwhm)
-                ),
-                "resolution_R_effective": (
-                    None
-                    if seg_fwhm is None
-                    else float(C_KMS / seg_fwhm)
-                ),
-                "lsf_sampling": lsf_sampling,
-            }
-        )
+        segment_item = {
+            "name": meta.get("name"),
+            "input_index": int(meta.get("index", index)),
+            "weight": float(meta.get("weight", 1.0)),
+            "n_support": n_support,
+            "n_fit": n_fit,
+            "mask_fraction": (
+                None if n_support <= 0 else float(1.0 - n_fit / float(n_support))
+            ),
+            "outside_fit_window_fraction": mask_summary.get(
+                "outside_fit_window_fraction"
+            ),
+            "rejected_inside_fit_window_fraction": mask_summary.get(
+                "rejected_inside_fit_window_fraction"
+            ),
+            "wave_min": meta.get("wave_min"),
+            "wave_max": meta.get("wave_max"),
+            "input_error_model": input_error_model,
+            "error_floor": error_floor,
+            "mask_summary": mask_summary,
+            "mask_provenance": mask_provenance,
+            "lsf_fwhm_kms": (
+                None if seg_fwhm is None else float(seg_fwhm)
+            ),
+            "resolution_R_effective": (
+                None if seg_fwhm is None else float(C_KMS / seg_fwhm)
+            ),
+            "lsf_sampling": lsf_sampling,
+        }
+        if continuum_diagnostics:
+            segment_item["continuum"] = dict(continuum_diagnostics[index])
+        segment_diagnostics.append(segment_item)
 
     grid_summary = _parameter_grid_summary(phoenix_lib)
     edge_flags = _grid_edge_flags(np.asarray(best_parameters, dtype=float), grid_summary)
@@ -1577,6 +1580,14 @@ def _build_phoenix_fit_diagnostics(
             "Ordinary least-squares objective with sigma-normalized residuals."
         )
 
+    continuum_warning_flags = sorted(
+        {
+            str(flag)
+            for item in continuum_diagnostics
+            for flag in item.get("warning_flags", [])
+        }
+    )
+
     return {
         "schema_version": 1,
         "n_pixels": int(np.asarray(residuals).size),
@@ -1624,7 +1635,19 @@ def _build_phoenix_fit_diagnostics(
         "outside_fit_window_fraction": outside_fit_window_fraction,
         "rejected_inside_fit_window_fraction": rejected_inside_fit_window_fraction,
         "continuum_degree": int(mdeg),
-        "continuum_warning_flags": [],
+        "continuum_warning_flags": continuum_warning_flags,
+        "continuum_model": {
+            "type": "multiplicative_legendre_per_segment",
+            "degree": int(mdeg),
+            "n_profiled_parameters": int(retained_count * (int(mdeg) + 1)),
+            "segment_parameters_are_independent": True,
+            "physical_parameters_are_shared": ["teff", "feh", "logg", "rv_kms"],
+            "segments": [dict(item) for item in continuum_diagnostics],
+            "interpretation": (
+                "Per-segment nuisance corrections profiled in flux space; "
+                "they do not establish physical cross-arm flux calibration."
+            ),
+        },
         "segment_rv_scatter": None,
         "wavelength_metadata_summary": _metadata_summary(forward_segments),
         "resolution_metadata_summary": {
@@ -1658,6 +1681,9 @@ def _phoenix_quality_flags(diagnostics, success=True, high_chi2_threshold=5.0):
     if bool(diagnostics.get("fallback_errors_used", False)):
         flags.append("fallback_errors_used")
         flags.append("chi2_effective_not_calibrated")
+    flags.extend(
+        str(flag) for flag in diagnostics.get("continuum_warning_flags", [])
+    )
     flags.extend(
         str(flag)
         for flag in diagnostics.get("parameter_uncertainty", {}).get(
@@ -2134,7 +2160,24 @@ def _solve_multiplicative_legendre(wave, flux, err, model_flux, mdeg):
     if mdeg < 0:
         raise ValueError("mdeg must be >= 0")
 
-    good = np.isfinite(model_flux) & np.isfinite(flux) & np.isfinite(err) & (err > 0) & (model_flux != 0)
+    wave = np.asarray(wave, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+    err = np.asarray(err, dtype=float)
+    model_flux = np.asarray(model_flux, dtype=float)
+    if not (
+        wave.shape == flux.shape == err.shape == model_flux.shape
+        and wave.ndim == 1
+    ):
+        raise ValueError("wave, flux, err, and model_flux must be matching 1D arrays.")
+
+    good = (
+        np.isfinite(wave)
+        & np.isfinite(model_flux)
+        & np.isfinite(flux)
+        & np.isfinite(err)
+        & (err > 0)
+        & (model_flux != 0)
+    )
     if np.sum(good) < (mdeg + 1):
         return model_flux, np.r_[1.0, np.zeros(mdeg)]
 
@@ -2158,14 +2201,10 @@ def _solve_multiplicative_legendre(wave, flux, err, model_flux, mdeg):
 
     coeffs, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
 
-    # Apply polynomial to all points
-    denom_all = (wave.max() - wave.min())
-    if denom_all == 0:
-        poly = np.ones_like(wave)
-    else:
-        x_all = 2.0 * (wave - wave.min()) / denom_all - 1.0
-        V_all = legvander(x_all, mdeg)
-        poly = V_all @ coeffs
+    # Apply the polynomial using the same retained wavelength normalization
+    # that defined the fitted coefficients. This matters when invalid model,
+    # flux, or error samples remove one or both segment edges.
+    poly = evaluate_legendre_continuum(wave, w, coeffs)
 
     return model_flux * poly, coeffs
     
@@ -2210,6 +2249,166 @@ def evaluate_legendre_continuum(wave_eval, wave_ref, coeffs):
     x = 2.0 * (wave_eval - wmin) / denom - 1.0
     V = legvander(x, coeffs.size - 1)
     return V @ coeffs
+
+
+def _legendre_continuum_diagnostics(wave_ref, coeffs, wave_eval=None):
+    """Return JSON-safe diagnostics for one fitted Legendre continuum.
+
+    The reported pivot scale and derivatives are evaluated from the complete
+    polynomial. They must not be inferred from individual Legendre
+    coefficients when the degree is greater than one.
+    """
+    wave_ref = np.asarray(wave_ref, dtype=float)
+    coeffs = np.asarray(coeffs, dtype=float)
+    finite_ref = wave_ref[np.isfinite(wave_ref)]
+    if coeffs.ndim != 1 or coeffs.size == 0:
+        raise ValueError("coeffs must be a non-empty 1D array.")
+    if finite_ref.size == 0:
+        return {
+            "degree": int(coeffs.size - 1),
+            "coefficients": coeffs.tolist(),
+            "reference_wave_min_A": None,
+            "reference_wave_max_A": None,
+            "pivot_wave_A": None,
+            "pivot_factor": None,
+            "log_slope_at_pivot": None,
+            "log_curvature_at_pivot": None,
+            "factor_min": None,
+            "factor_max": None,
+            "factor_dynamic_range": None,
+            "warning_flags": ["continuum_reference_wave_missing"],
+        }
+
+    wmin = float(np.min(finite_ref))
+    wmax = float(np.max(finite_ref))
+    span = float(wmax - wmin)
+    pivot = 0.5 * (wmin + wmax)
+    pivot_factor = float(legval(0.0, coeffs))
+
+    log_slope = None
+    log_curvature = None
+    if span > 0.0 and np.isfinite(pivot_factor) and pivot_factor != 0.0:
+        first = legder(coeffs, m=1)
+        d_factor_d_wave = float(legval(0.0, first) * (2.0 / span))
+        log_slope = float(pivot * d_factor_d_wave / pivot_factor)
+        d2_factor_d_wave2 = 0.0
+        if coeffs.size >= 3:
+            second = legder(coeffs, m=2)
+            d2_factor_d_wave2 = float(
+                legval(0.0, second) * (2.0 / span) ** 2
+            )
+        # d^2 ln(P) / d(ln(lambda))^2 at the pivot.
+        log_curvature = float(
+            log_slope
+            + pivot * pivot * d2_factor_d_wave2 / pivot_factor
+            - log_slope * log_slope
+        )
+
+    if wave_eval is None:
+        wave_eval = finite_ref
+    wave_eval = np.asarray(wave_eval, dtype=float)
+    finite_eval = wave_eval[np.isfinite(wave_eval)]
+    factors = evaluate_legendre_continuum(finite_eval, finite_ref, coeffs)
+    finite_factors = factors[np.isfinite(factors)]
+    if finite_factors.size:
+        factor_min = float(np.min(finite_factors))
+        factor_max = float(np.max(finite_factors))
+    else:
+        factor_min = None
+        factor_max = None
+    if factor_min is not None and factor_min > 0.0:
+        dynamic_range = float(factor_max / factor_min)
+    else:
+        dynamic_range = None
+
+    flags = []
+    if not np.all(np.isfinite(coeffs)) or not np.isfinite(pivot_factor):
+        flags.append("continuum_nonfinite")
+    if factor_min is None or factor_max is None:
+        flags.append("continuum_evaluation_missing")
+    elif factor_min <= 0.0:
+        flags.append("continuum_nonpositive")
+    if dynamic_range is not None and dynamic_range > 10.0:
+        flags.append("continuum_large_excursion")
+    if np.isfinite(pivot_factor) and (
+        pivot_factor < 0.1 or pivot_factor > 10.0
+    ):
+        flags.append("continuum_pivot_scale_extreme")
+
+    return {
+        "degree": int(coeffs.size - 1),
+        "coefficients": coeffs.tolist(),
+        "reference_wave_min_A": wmin,
+        "reference_wave_max_A": wmax,
+        "reference_wave_span_A": span,
+        "reference_pixel_count": int(finite_ref.size),
+        "pivot_wave_A": pivot,
+        "pivot_factor": pivot_factor,
+        "log_slope_at_pivot": log_slope,
+        "log_curvature_at_pivot": log_curvature,
+        "factor_min": factor_min,
+        "factor_max": factor_max,
+        "factor_dynamic_range": dynamic_range,
+        "warning_flags": sorted(set(flags)),
+        "interpretation": (
+            "Multiplicative model-correction diagnostic; not an absolute-flux "
+            "calibration or physical SED measurement."
+        ),
+    }
+
+
+def _profiled_continuum_diagnostic(
+    wave,
+    err,
+    coeffs,
+    normalized_residual,
+    segment_weight,
+    segment_index,
+):
+    """Add fit-contribution metadata to one continuum diagnostic."""
+    normalized_residual = np.asarray(normalized_residual, dtype=float)
+    err = np.asarray(err, dtype=float)
+    segment_weight = float(segment_weight)
+    chi2_unweighted = float(np.sum(normalized_residual**2))
+    item = _legendre_continuum_diagnostics(wave, coeffs, wave_eval=wave)
+    item.update(
+        {
+            "segment_index": int(segment_index),
+            "weight": segment_weight,
+            "n_fit": int(np.asarray(wave).size),
+            "chi2_unweighted": chi2_unweighted,
+            "chi2_weighted": float(segment_weight * chi2_unweighted),
+            "weighted_inverse_variance_sum": float(
+                segment_weight * np.sum(1.0 / (err * err))
+            ),
+        }
+    )
+    return item
+
+
+def _add_continuum_contribution_fractions(continuum_diagnostics):
+    """Annotate per-segment diagnostics with normalized fit contributions."""
+    weighted_total = float(
+        sum(item["chi2_weighted"] for item in continuum_diagnostics)
+    )
+    precision_total = float(
+        sum(
+            item["weighted_inverse_variance_sum"]
+            for item in continuum_diagnostics
+        )
+    )
+    for item in continuum_diagnostics:
+        item["weighted_chi2_fraction"] = (
+            None
+            if weighted_total <= 0.0
+            else float(item["chi2_weighted"] / weighted_total)
+        )
+        item["weighted_inverse_variance_fraction"] = (
+            None
+            if precision_total <= 0.0
+            else float(item["weighted_inverse_variance_sum"] / precision_total)
+        )
+    return continuum_diagnostics
     
 
 def reconstruct_phoenix_legendre_models_for_segments(
@@ -3290,7 +3489,7 @@ def fit_phoenix_full_spectrum(
     
     invalid_model_evaluations = {"count": 0}
 
-    def residuals(p):
+    def _evaluate_residuals(p, include_continuum_diagnostics=False):
         teff, feh, logg, rv_kms = float(p[0]), float(p[1]), float(p[2]), float(p[3])
         rv_tot = rv_bary_kms + rv_kms
 
@@ -3298,16 +3497,27 @@ def fit_phoenix_full_spectrum(
             model0 = phoenix_lib.evaluate(teff, feh, logg)
         except ValueError:
             invalid_model_evaluations["count"] += 1
-            return np.ones_like(flux_all) * 1e6
+            invalid = np.ones_like(flux_all) * 1e6
+            if include_continuum_diagnostics:
+                return invalid, []
+            return invalid
 
         out = np.empty_like(flux_all)
+        continuum_diagnostics = []
 
         if forward_model == "interp_observed":
             shifted = _apply_observed_grid_rv_shift(support_wave_all, model0, rv_tot)
             
-            for support_sl, fit_sl, fit_mask, seg_weight, seg_fwhm in zip(
-                support_slices, fit_slices, fit_masks, fit_weights, segment_fwhm_kms
+            for seg_index, values in enumerate(
+                zip(
+                    support_slices,
+                    fit_slices,
+                    fit_masks,
+                    fit_weights,
+                    segment_fwhm_kms,
+                )
             ):
+                support_sl, fit_sl, fit_mask, seg_weight, seg_fwhm = values
                 w_support = support_wave_all[support_sl]
                 m_support = _gaussian_broaden_velocity(
                     w_support,
@@ -3320,8 +3530,22 @@ def fit_phoenix_full_spectrum(
                 e = err_all[fit_sl]
                 m = m_support[fit_mask]
                 
-                m_corr, coeffs = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
-                out[fit_sl] = np.sqrt(float(seg_weight)) * (f - m_corr) / e
+                m_corr, coeffs = _solve_multiplicative_legendre(
+                    w, f, e, m, mdeg=mdeg
+                )
+                normalized_residual = (f - m_corr) / e
+                out[fit_sl] = np.sqrt(float(seg_weight)) * normalized_residual
+                if include_continuum_diagnostics:
+                    continuum_diagnostics.append(
+                        _profiled_continuum_diagnostic(
+                            wave=w,
+                            err=e,
+                            coeffs=coeffs,
+                            normalized_residual=normalized_residual,
+                            segment_weight=seg_weight,
+                            segment_index=seg_index,
+                        )
+                    )
         else:
             model_list = build_phoenix_native_models_for_segments(
                 segments=forward_segments,
@@ -3336,9 +3560,16 @@ def fit_phoenix_full_spectrum(
                 extrapolate=True,
             )
             
-            for seg, model_full, fit_sl, fit_mask, seg_weight in zip(
-                forward_segments, model_list, fit_slices, fit_masks, fit_weights
+            for seg_index, values in enumerate(
+                zip(
+                    forward_segments,
+                    model_list,
+                    fit_slices,
+                    fit_masks,
+                    fit_weights,
+                )
             ):
+                seg, model_full, fit_sl, fit_mask, seg_weight = values
                 w_support = np.asarray(seg.wave, dtype=float)
 
                 w = w_support[fit_mask]
@@ -3346,10 +3577,31 @@ def fit_phoenix_full_spectrum(
                 e = err_all[fit_sl]
                 m = np.asarray(model_full, dtype=float)[fit_mask]
 
-                m_corr, coeffs = _solve_multiplicative_legendre(w, f, e, m, mdeg=mdeg)
-                out[fit_sl] = np.sqrt(float(seg_weight)) * (f - m_corr) / e
+                m_corr, coeffs = _solve_multiplicative_legendre(
+                    w, f, e, m, mdeg=mdeg
+                )
+                normalized_residual = (f - m_corr) / e
+                out[fit_sl] = np.sqrt(float(seg_weight)) * normalized_residual
+                if include_continuum_diagnostics:
+                    continuum_diagnostics.append(
+                        _profiled_continuum_diagnostic(
+                            wave=w,
+                            err=e,
+                            coeffs=coeffs,
+                            normalized_residual=normalized_residual,
+                            segment_weight=seg_weight,
+                            segment_index=seg_index,
+                        )
+                    )
 
+        if include_continuum_diagnostics:
+            return out, _add_continuum_contribution_fractions(
+                continuum_diagnostics
+            )
         return out
+
+    def residuals(p):
+        return _evaluate_residuals(p, include_continuum_diagnostics=False)
     
     # RV initialization by coarse grid scan (optional)
     if rv_init == "grid":
@@ -3533,7 +3785,10 @@ def fit_phoenix_full_spectrum(
 
     # Compute diagnostics. If segment weights are used, chi2 is the weighted
     # sum of squared normalized residuals.
-    r = res.fun
+    r, continuum_diagnostics = _evaluate_residuals(
+        res.x,
+        include_continuum_diagnostics=True,
+    )
     chi2 = float(np.sum(r * r))
     n = int(r.size)
     # Analytically solved continuum coefficients still consume degrees of freedom.
@@ -3618,6 +3873,7 @@ def fit_phoenix_full_spectrum(
         error_model=error_model,
         error_floor_applied=error_floor_applied,
         parameter_errors_available=parameter_errors is not None,
+        continuum_diagnostics=continuum_diagnostics,
     )
     quality_flags = _phoenix_quality_flags(diagnostics, success=res.success)
     velocity_convention = diagnostics["velocity_convention"]

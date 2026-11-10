@@ -10,6 +10,30 @@ plotting.py: plotting helpers
 scripts/: smoke tests
 examples/: user-facing notebooks
 
+Continuum and multi-arm boundary
+--------------------------------
+
+The production PHOENIX likelihood keeps arms/orders as separate
+`SpectrumSegment` objects. `Teff`, `[Fe/H]`, `logg`, and RV are shared across
+the collection; multiplicative Legendre coefficients are independently
+profiled per retained segment. A free arm scale multiplied by another
+polynomial with a free constant would duplicate this freedom and is therefore
+not a separate supported mode. Any future linked-arm calibration must
+normalize its shape functions, define a reference/global scale, and demonstrate
+identifiability plus held-out benefit before gaining a public API.
+
+Continuum diagnostics remain part of `fitting.py` while only one fit mode uses
+them. A dedicated `continuum.py` should be introduced only when the same basis
+or constraints have multiple real consumers. Physical-flux/SED inference is a
+separate expert workflow because angular radius and extinction require absolute
+flux or photometric anchors.
+
+Instrument product masks belong in `preprocessing.py`, not readers. In
+particular, X-SHOOTER dichroic intervals are warning-only by default and are
+mapped from their instrument wavelength frame into the current data frame when
+correction provenance is available. Readers continue to preserve the input
+mask and never silently apply those science-policy exclusions.
+
 ## Mask/preprocessing review staging
 
 The mask/preprocessing layer is intended to be strict at the scientific

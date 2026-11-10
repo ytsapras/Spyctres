@@ -45,3 +45,50 @@ spyctres doctor --require-phoenix
 
 The `--skip-phoenix-scan` option deliberately checks only the configured root
 and wavelength grid; it does not verify that templates can be discovered.
+
+## Multi-segment continuum and X-SHOOTER masks
+
+Date: 10 November 2026
+
+In a joint `SpectrumCollection` PHOENIX fit, Spyctres shares
+`Teff`, `[Fe/H]`, `logg`, and `rv_kms` across retained segments. It profiles a
+separate multiplicative Legendre polynomial in every segment. For `J` retained
+segments the complete fitted-parameter count is therefore:
+
+| `mdeg` | Continuum freedom per segment | Total parameter count |
+|---:|---|---:|
+| 0 | normalization | `4 + J` |
+| 1 | normalization and tilt | `4 + 2J` |
+| 2 | normalization, tilt, and curvature | `4 + 3J` |
+| 3 | normalization through cubic shape | `4 + 4J` |
+
+The public `continuum_degree` argument is an alias for `mdeg`; do not pass both.
+Fit reports now include per-segment continuum diagnostics under
+`diagnostics.continuum_model`. The pivot factor, logarithmic slope/curvature,
+factor range, and weighted residual contribution are evaluated from the full
+polynomial. Individual Legendre coefficients should not be interpreted as
+physical arm scales, particularly for degree 2 and above. These polynomials
+correct continuum/model mismatch and do not determine an absolute SED or
+angular radius. Collection weights alter the statistical likelihood; they are
+not flux-calibration factors.
+
+The X-SHOOTER UVB/VIS and VIS/NIR dichroic regions are product-specific and are
+not silently masked by readers. Use:
+
+```python
+import Spyctres as sp
+
+mask = sp.build_mask(
+    spectrum,
+    xshooter_dichroics="warn",  # inspect first
+    tellurics="warn",
+)
+```
+
+Use `xshooter_dichroics="mask"` only when wavelength-frame provenance permits
+an exact or recorded frame mapping. `"conservative"` explicitly accepts a
+wider velocity-margin envelope when the mapping is unresolved and records that
+choice as a quality flag. XSL DR3 is already arm-combined and corrected to the
+stellar rest frame. Spyctres maps its warning/mask envelopes using the recorded
+`REST_UVB`, `REST_VIS`, and `REST_NIR` corrections; the three effective-LSF
+segments returned by the reader are not original independent arms.

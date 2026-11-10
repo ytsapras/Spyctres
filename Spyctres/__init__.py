@@ -109,6 +109,7 @@ from .preprocessing import (
     NONSTELLAR_FEATURES,
     OPTICAL_DIB_DIAGNOSTIC_FEATURES,
     OPTICAL_TELLURIC_DIAGNOSTIC_FEATURES,
+    XSHOOTER_DICHROIC_MASK_CATALOG,
     ExclusionMaskSpec,
     MaskBundle,
     archive_exclusion_masks,
@@ -134,6 +135,8 @@ from .preprocessing import (
     wavelength_region_exclusion_mask,
     broad_telluric_catalog_fallback_mask,
     telluric_transmission_exclusion_mask,
+    xshooter_dichroic_exclusion_mask,
+    xshooter_dichroic_mask_catalog,
 )
 from .waveutils import convert_segment_wavelength_medium, convert_wavelength_medium
 from .fitting import FitProgressEvent
@@ -215,11 +218,13 @@ __all__ = [
     "exclusion_mask", "wavelength_region_exclusion_mask",
     "NONSTELLAR_FEATURES", "OPTICAL_DIB_DIAGNOSTIC_FEATURES",
     "OPTICAL_TELLURIC_DIAGNOSTIC_FEATURES",
+    "XSHOOTER_DICHROIC_MASK_CATALOG",
     "find_known_nonstellar_features",
     "known_feature_masks", "nonstellar_feature_mask", "nonstellar_feature_masks",
     "nonstellar_feature_metadata", "nonstellar_feature_regions",
     "overlapping_nonstellar_features", "broad_telluric_catalog_fallback_mask",
     "telluric_transmission_exclusion_mask",
+    "xshooter_dichroic_exclusion_mask", "xshooter_dichroic_mask_catalog",
     "convert_wavelength_medium", "convert_segment_wavelength_medium",
     "FitProgressEvent",
 ]

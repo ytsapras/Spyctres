@@ -174,6 +174,16 @@ envelope for archival and reviewer-facing products.
    where possible as normalized residuals with broad absolute floors, not as
    one universal pass/fail rule.
 
+   Multi-arm continuum work follows an audit-first gate. The current joint
+   fitter already shares the four physical parameters and profiles independent
+   per-segment Legendre continua. Initial implementation therefore exposes
+   evaluated per-arm continuum and likelihood-contribution diagnostics, adds
+   scale/slope and masked-edge regression tests, and provides explicit
+   frame-aware X-SHOOTER dichroic warning/mask policies. Do not add a nominal
+   linked-arm mode unless synthetic and independent real-product validation
+   demonstrate identifiable information beyond this baseline. XSL DR3 is an
+   already merged comparison product, not independent truth for arm stitching.
+
 7. **Quickscan/refine calibration and throughput.**
    Continue the quality-gated quickscan/refine approach for batches of tens to
    hundreds of spectra, but measure more than runtime. Track false narrowing:

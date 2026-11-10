@@ -333,7 +333,12 @@ sp.plot_fit_referee(result)
 For explicit mask review, keep warning and masking choices visible:
 
 ```python
-mask_bundle = sp.build_mask(spec, archive=True, tellurics="warn")
+mask_bundle = sp.build_mask(
+    spec,
+    archive=True,
+    xshooter_dichroics="warn",  # relevant for X-SHOOTER/XSL products
+    tellurics="warn",
+)
 print(mask_bundle.summary_text())
 sp.plot_spectrum(spec, mask=mask_bundle, show_nonstellar=True)
 result_masked = sp.fit_stellar_spectrum(
@@ -658,6 +663,28 @@ opt-in: call `fit_stellar_spectrum(path, reader=..., record_input_checksum=True)
 when you want the input-file SHA256 recorded for reproducibility.
 Existing low-level fitting functions keep returning dictionaries for backward
 compatibility.
+
+For a `SpectrumCollection`, the four physical parameters (`teff`, `feh`,
+`logg`, and `rv_kms`) are shared, while the multiplicative Legendre continuum
+is profiled independently in every retained segment. Thus `mdeg=0` already
+provides one independent normalization per segment, `mdeg=1` adds an
+independent tilt, and so on. `continuum_degree` in the public facade maps
+directly to `mdeg`. The result's
+`diagnostics["continuum_model"]["segments"]` block reports the evaluated pivot
+factor, slope, curvature, range, and weighted residual contribution for each
+segment. These are nuisance-model diagnostics, not a physical cross-arm flux
+calibration or SED measurement. `SpectrumCollection.weights` change each
+segment's likelihood contribution; they are not display tapers or arm scales.
+
+X-SHOOTER dichroic regions are also explicit rather than reader defaults.
+`build_mask(..., xshooter_dichroics="warn")` records frame-mapped warning
+regions. `"mask"` applies them only when the instrument-to-data wavelength
+mapping is known. `"conservative"` is an explicit opt-in to a wider interval
+when that mapping cannot be established, and records the adopted velocity
+margin in provenance. XSL DR3 is an already merged/rest-frame product, so its
+recorded per-arm rest corrections are used to construct conservative mapped
+envelopes; its three returned regions must not be treated as original
+independent arms.
 The scientific default forward model is `native_interp`, which keeps the model
 on a dense PHOENIX wavelength grid until after RV shifting and LSF convolution.
 The older `interp_observed` path remains available only as an explicit

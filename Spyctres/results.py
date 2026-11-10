@@ -807,6 +807,34 @@ QUALITY_FLAG_DESCRIPTIONS = {
         "Residuals have a large wavelength-dependent slope; inspect continuum "
         "normalization, arm scaling, and flux calibration."
     ),
+    "continuum_nonfinite": (
+        "At least one profiled multiplicative continuum has nonfinite "
+        "coefficients or a nonfinite pivot value."
+    ),
+    "continuum_evaluation_missing": (
+        "At least one profiled continuum could not be evaluated on finite fit "
+        "pixels."
+    ),
+    "continuum_reference_wave_missing": (
+        "At least one profiled continuum lacks a finite wavelength reference "
+        "range."
+    ),
+    "continuum_nonpositive": (
+        "At least one multiplicative continuum becomes zero or negative over "
+        "its fitted pixels and is not physically interpretable as a scale."
+    ),
+    "continuum_large_excursion": (
+        "At least one per-segment continuum varies by more than a factor of ten "
+        "over its fitted pixels; inspect calibration, masking, and model mismatch."
+    ),
+    "continuum_pivot_scale_extreme": (
+        "At least one per-segment continuum pivot factor lies outside 0.1-10; "
+        "this is a diagnostic correction, not a validated arm calibration."
+    ),
+    "xshooter_dichroic_frame_conservative": (
+        "An X-SHOOTER dichroic mask used a conservative velocity envelope "
+        "because an exact instrument-to-data frame mapping was unavailable."
+    ),
     "fit_bound_hit": (
         "At least one fitted physical parameter lies on an allowed grid or fit "
         "boundary."
@@ -1021,6 +1049,53 @@ QUALITY_FLAG_CLASSIFICATION = {
         "action": (
             "Review continuum normalization, segment scaling, and flux "
             "calibration; compare a controlled continuum-degree variant."
+        ),
+    },
+    "continuum_nonfinite": {
+        "severity": "review",
+        "category": "continuum",
+        "action": "Inspect the affected segment and do not interpret its continuum correction.",
+    },
+    "continuum_evaluation_missing": {
+        "severity": "review",
+        "category": "continuum",
+        "action": "Check the segment fit mask and finite model support.",
+    },
+    "continuum_reference_wave_missing": {
+        "severity": "review",
+        "category": "continuum",
+        "action": "Check that finite fitted wavelengths remain in every retained segment.",
+    },
+    "continuum_nonpositive": {
+        "severity": "review",
+        "category": "continuum",
+        "action": (
+            "Inspect continuum degree, masks, and model mismatch; do not treat "
+            "this correction as an arm scale."
+        ),
+    },
+    "continuum_large_excursion": {
+        "severity": "review",
+        "category": "continuum",
+        "action": (
+            "Compare a lower continuum degree and inspect flux calibration, "
+            "edge masks, and residual structure."
+        ),
+    },
+    "continuum_pivot_scale_extreme": {
+        "severity": "review",
+        "category": "continuum",
+        "action": (
+            "Review input flux scaling and report this only as a nuisance "
+            "model correction, not physical SED calibration."
+        ),
+    },
+    "xshooter_dichroic_frame_conservative": {
+        "severity": "advisory",
+        "category": "mask",
+        "action": (
+            "Record the adopted velocity margin and compare against an exact "
+            "frame-mapped mask when correction provenance becomes available."
         ),
     },
     "fit_bound_hit": {

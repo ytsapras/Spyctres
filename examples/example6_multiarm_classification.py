@@ -24,6 +24,11 @@ claim.  X-SHOOTER arm flux calibration, telluric residuals, wavelength-dependent
 LSF structure, and line-specific residuals still need human review before a
 multi-arm result can support reviewed-analysis stellar parameters.
 
+The documented UVB/VIS and VIS/NIR dichroic regions are shown as frame-aware
+warnings by default. They are not silently excluded; masking them is a separate
+explicit sensitivity choice because the affected boundaries depend on the
+working wavelength frame.
+
 Example inspection run:
 
   python examples/example6_multiarm_classification.py --no-show
@@ -350,6 +355,7 @@ def main(argv=None):
     reviewed_mask = sp.build_mask(
         collection,
         archive="mask",
+        xshooter_dichroics="warn",
         tellurics="warn",
         dibs=False,
     )

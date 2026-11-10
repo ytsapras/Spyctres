@@ -134,6 +134,14 @@ effective-resolution provenance.  Spyctres therefore uses the product-specific
 `xsl_dr3` reader and does not apply hidden arm rescaling or another RV
 correction.
 
+Example 6 keeps the original UVB/VIS/NIR products separate and shows the
+documented dichroic/overlap intervals as frame-aware warnings. Those warnings
+are not masks unless the caller explicitly requests
+`build_mask(..., xshooter_dichroics="mask")`. For a joint PHOENIX fit, stellar
+parameters are shared but each retained arm has its own multiplicative
+Legendre continuum. The reported continuum pivot factors and slopes are useful
+calibration/model-mismatch diagnostics; they are not a physical stitched SED.
+
 PEPSI products in Example 8 need similar caution.  The `.dxt.nor` suffix alone
 does not uniquely define the wavelength frame for every public or local
 delivery.  The example keeps the working wavelength hypothesis explicit and

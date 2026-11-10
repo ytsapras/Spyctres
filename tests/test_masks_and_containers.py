@@ -31,7 +31,10 @@ from Spyctres.preprocessing import (
     overlapping_nonstellar_features,
     telluric_transmission_exclusion_mask,
     wavelength_region_exclusion_mask,
+    xshooter_dichroic_exclusion_mask,
+    xshooter_dichroic_mask_catalog,
 )
+from Spyctres.waveutils import doppler_factor
 
 
 def test_segment_default_mask_rejects_invalid_data_and_errors():
@@ -184,6 +187,138 @@ def test_build_mask_exposes_single_segment_valid_mask_and_summary():
     assert summary["n_exclusion_masks"] == 1
     assert summary["has_valid_mask"] is True
     assert "Spyctres mask bundle" in bundle.summary_text()
+
+
+def test_xshooter_dichroic_mask_is_exact_on_raw_topocentric_arm():
+    segment = SpectrumSegment(
+        wave=[5449.0, 5450.0, 5700.0, 5900.0, 5901.0],
+        flux=np.ones(5),
+        err=np.full(5, 0.02),
+        observer_frame="topocentric",
+        stellar_rest_status="observed",
+        meta={"instrument": "XSHOOTER", "arm": "UVB"},
+    )
+
+    catalog = xshooter_dichroic_mask_catalog(segment)
+    assert len(catalog) == 1
+    assert catalog[0]["region_A"] == [5450.0, 5900.0]
+    assert catalog[0]["frame_mapping_status"] == "exact_topocentric"
+    assert catalog[0]["safe_for_explicit_mask"] is True
+
+    default_bundle = build_mask(segment, tellurics=False)
+    assert len(default_bundle) == 0
+    assert np.all(default_bundle.valid_mask)
+
+    bundle = build_mask(
+        segment,
+        xshooter_dichroics="mask",
+        tellurics=False,
+    )
+    assert [mask.name for mask in bundle] == ["xshooter:dichroic_regions"]
+    assert np.array_equal(bundle.valid_mask, [True, False, False, False, True])
+
+
+def test_xsl_dichroic_regions_use_rest_correction_envelopes():
+    corrections = {
+        "REST_UVB": -3.5,
+        "REST_VIS": -14.2,
+        "REST_NIR": -10.2,
+    }
+    common_meta = {
+        "instrument": "XSL DR3",
+        "xsl_release": "DR3",
+        "xsl_combined_arms": True,
+        "velocity_corrections": {"rest_corrections_kms": corrections},
+    }
+    collection = SpectrumCollection(
+        [
+            SpectrumSegment(
+                [5450.0, 5900.0],
+                [1.0, 1.0],
+                err=[0.1, 0.1],
+                wave_frame="stellar_rest",
+                observer_frame="not_applicable",
+                stellar_rest_status="corrected",
+                meta={**common_meta, "arm": "UVB"},
+            ),
+            SpectrumSegment(
+                [6000.0, 9940.0],
+                [1.0, 1.0],
+                err=[0.1, 0.1],
+                wave_frame="stellar_rest",
+                observer_frame="not_applicable",
+                stellar_rest_status="corrected",
+                meta={**common_meta, "arm": "VIS"},
+            ),
+            SpectrumSegment(
+                [10000.0, 11500.0],
+                [1.0, 1.0],
+                err=[0.1, 0.1],
+                wave_frame="stellar_rest",
+                observer_frame="not_applicable",
+                stellar_rest_status="corrected",
+                meta={**common_meta, "arm": "NIR"},
+            ),
+        ],
+        meta=common_meta,
+    )
+
+    catalog = xshooter_dichroic_mask_catalog(collection)
+    assert len(catalog) == 2
+    first = catalog[0]
+    expected_intervals = [
+        (5450.0 / doppler_factor(value), 5900.0 / doppler_factor(value))
+        for value in (-3.5, -14.2)
+    ]
+    assert first["region_A"][0] == pytest.approx(
+        min(interval[0] for interval in expected_intervals)
+    )
+    assert first["region_A"][1] == pytest.approx(
+        max(interval[1] for interval in expected_intervals)
+    )
+    assert first["removed_velocities_kms"] == [-3.5, -14.2]
+    assert first["frame_mapping_status"] == "conservative_frame_mapped_envelope"
+    assert first["safe_for_explicit_mask"] is True
+
+
+def test_xshooter_dichroic_mask_requires_or_records_conservative_frame_policy():
+    segment = SpectrumSegment(
+        wave=np.linspace(5400.0, 6000.0, 31),
+        flux=np.ones(31),
+        err=np.full(31, 0.02),
+        observer_frame="barycentric",
+        stellar_rest_status="observed",
+        meta={"instrument": "XSHOOTER", "arm": "VIS"},
+    )
+
+    with pytest.raises(ValueError, match="Cannot map X-SHOOTER dichroic region"):
+        xshooter_dichroic_exclusion_mask(segment)
+    with pytest.raises(ValueError, match="Cannot map X-SHOOTER dichroic region"):
+        build_mask(segment, xshooter_dichroics="mask", tellurics=False)
+
+    conservative = xshooter_dichroic_exclusion_mask(
+        segment,
+        unresolved_policy="conservative",
+        unresolved_velocity_margin_kms=500.0,
+    )
+    metadata = conservative.metadata
+    assert metadata["quality_flags"] == [
+        "xshooter_dichroic_frame_conservative"
+    ]
+    assert all(
+        item["safe_for_explicit_mask"] is True for item in metadata["catalog"]
+    )
+    composed = compose_fit_mask(segment, exclude_masks=[conservative])
+    assert "xshooter_dichroic_frame_conservative" in composed.settings[
+        "quality_flags"
+    ]
+    bundle = build_mask(
+        segment,
+        xshooter_dichroics="conservative",
+        tellurics=False,
+    )
+    assert len(bundle) == 1
+    assert bundle.metadata["components"][0]["action"] == "conservative"
 
 
 def test_exclusion_mask_apis_are_mutually_exclusive():

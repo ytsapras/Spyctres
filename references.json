@@ -163,10 +163,12 @@
       "url": "https://doi.org/10.1051/0004-6361/202142388",
       "validated_via": "Publisher metadata, official XSL DR3 site, and CDS catalogue description",
       "validated_on": "2026-07-05",
-      "description": "Defines the XSL DR3 combined-arm, air-wavelength, stellar-rest-frame spectral products and their effective arm-dependent velocity resolutions. It also supplies the Figure 1 reference-star sequence and the adopted parameters for the added M dwarfs. Spyctres uses these semantics for ingestion and empirical PHOENIX classification validation.",
+      "description": "Defines the XSL DR3 combined-arm, air-wavelength, stellar-rest-frame spectral products, their effective arm-dependent velocity resolutions, and documented dichroic/overlap calibration limitations. It also supplies the Figure 1 reference-star sequence and the adopted parameters for the added M dwarfs. Spyctres uses these semantics for ingestion, explicit frame-aware dichroic warnings/masks, and empirical PHOENIX classification validation.",
       "affected_code": [
         "Spyctres/io.py:read_xsl_dr3",
+        "Spyctres/preprocessing.py:xshooter_dichroic_mask_catalog",
         "tests/test_io_canonical.py:test_xsl_dr3_reader_splits_effective_lsf_regions",
+        "tests/test_masks_and_containers.py:test_xsl_dichroic_regions_use_rest_correction_envelopes",
         "examples/xsl_figure1_validation.ipynb",
         "examples/xsl_validation_manifest.csv"
       ]

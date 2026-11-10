@@ -558,6 +558,9 @@ def test_nonstellar_feature_helpers_are_top_level_public_api():
     assert callable(Spyctres.dilate_boolean_mask)
     assert callable(Spyctres.wavelength_region_exclusion_mask)
     assert callable(Spyctres.telluric_transmission_exclusion_mask)
+    assert len(Spyctres.XSHOOTER_DICHROIC_MASK_CATALOG) == 2
+    assert callable(Spyctres.xshooter_dichroic_mask_catalog)
+    assert callable(Spyctres.xshooter_dichroic_exclusion_mask)
     assert callable(Spyctres.find_known_nonstellar_features)
     assert callable(Spyctres.plot_spectrum)
     assert callable(Spyctres.plot_fit_comparison_line_windows)

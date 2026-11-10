@@ -316,6 +316,331 @@ UVES_POP_ARCHIVE_MASK_CATALOG = (
 )
 
 
+XSHOOTER_DICHROIC_MASK_CATALOG = (
+    {
+        "id": "xshooter_uvb_vis_dichroic_5450_5900",
+        "name": "X-SHOOTER UVB/VIS dichroic region 5450-5900 A",
+        "instrument_region_A": (5450.0, 5900.0),
+        "affected_arms": ("UVB", "VIS"),
+        "mask_type": "instrument_product_bad_region",
+        "source": "Verro et al. (2022), XSL DR3",
+        "source_url": "https://doi.org/10.1051/0004-6361/202142388",
+        "default_action": "warn",
+        "description": (
+            "Dichroic/arm-overlap region whose calibration limitations are not "
+            "fully represented by formal flux uncertainties."
+        ),
+    },
+    {
+        "id": "xshooter_vis_nir_dichroic_9940_11500",
+        "name": "X-SHOOTER VIS/NIR dichroic region 9940-11500 A",
+        "instrument_region_A": (9940.0, 11500.0),
+        "affected_arms": ("VIS", "NIR"),
+        "mask_type": "instrument_product_bad_region",
+        "source": "Verro et al. (2022), XSL DR3",
+        "source_url": "https://doi.org/10.1051/0004-6361/202142388",
+        "default_action": "warn",
+        "description": (
+            "Dichroic/arm-overlap region whose calibration limitations are not "
+            "fully represented by formal flux uncertainties."
+        ),
+    },
+)
+
+
+def _relativistic_doppler_factor(velocity_kms):
+    beta = float(velocity_kms) / C_KMS
+    if not np.isfinite(beta) or abs(beta) >= 1.0:
+        raise ValueError(
+            "Wavelength-frame mapping velocity must be finite and smaller "
+            "than the speed of light."
+        )
+    return float(np.sqrt((1.0 + beta) / (1.0 - beta)))
+
+
+def _xshooter_rest_corrections_from_metadata(metadata):
+    metadata = dict(metadata or {})
+    corrections = dict(
+        metadata.get("velocity_corrections", {}).get(
+            "rest_corrections_kms", {}
+        )
+        or {}
+    )
+    provenance = dict(metadata.get("xsl_header_provenance", {}) or {})
+    for arm in ("UVB", "VIS", "NIR"):
+        key = "REST_{0}".format(arm)
+        if key in corrections:
+            continue
+        record = provenance.get(key)
+        if not isinstance(record, dict):
+            continue
+        try:
+            value = float(record.get("value"))
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(value):
+            corrections[key] = value
+    return corrections
+
+
+def _xshooter_region_mapping_velocities(spectrum, affected_arms):
+    """Return removed velocities that map one instrument interval to data."""
+    segments = _audit_segments(spectrum)
+    affected_arms = {str(arm).strip().upper() for arm in affected_arms}
+    metadata_records = [getattr(spectrum, "meta", {}) or {}]
+    metadata_records.extend(getattr(segment, "meta", {}) or {} for segment in segments)
+
+    is_xsl_dr3 = any(
+        str(meta.get("xsl_release", "")).strip().upper() == "DR3"
+        and bool(meta.get("xsl_combined_arms", False))
+        for meta in metadata_records
+    )
+    if is_xsl_dr3:
+        combined = {}
+        for meta in metadata_records:
+            combined.update(_xshooter_rest_corrections_from_metadata(meta))
+        missing = [
+            arm for arm in sorted(affected_arms)
+            if "REST_{0}".format(arm) not in combined
+        ]
+        if missing:
+            return {
+                "status": "unresolved",
+                "velocities_kms": [],
+                "missing": ["REST_{0}".format(arm) for arm in missing],
+                "source": "xsl_dr3_rest_header_provenance",
+            }
+        return {
+            "status": "mapped",
+            "velocities_kms": [
+                float(combined["REST_{0}".format(arm)])
+                for arm in sorted(affected_arms)
+            ],
+            "missing": [],
+            "source": "xsl_dr3_rest_header_envelope",
+        }
+
+    known_arms = {
+        str((getattr(segment, "meta", {}) or {}).get("arm", "")).strip().upper()
+        for segment in segments
+        if str((getattr(segment, "meta", {}) or {}).get("arm", "")).strip()
+        not in {"", "UNKNOWN"}
+    }
+    if known_arms and not (known_arms & affected_arms):
+        return {
+            "status": "not_applicable",
+            "velocities_kms": [],
+            "missing": [],
+            "source": "known_nonoverlapping_arm",
+        }
+
+    relevant = []
+    for segment in segments:
+        meta = getattr(segment, "meta", {}) or {}
+        arm = str(meta.get("arm", "")).strip().upper()
+        if arm and arm != "UNKNOWN" and arm not in affected_arms:
+            continue
+        observer_frame = str(getattr(segment, "observer_frame", "unknown")).lower()
+        rest_status = str(
+            getattr(segment, "stellar_rest_status", "unknown")
+        ).lower()
+        if observer_frame == "topocentric" and rest_status in {"raw", "observed"}:
+            relevant.append((0.0, "raw_topocentric_data_grid"))
+            continue
+        applied = getattr(segment, "stellar_rv_applied_kms", None)
+        if rest_status == "corrected" and applied is not None:
+            try:
+                applied = float(applied)
+            except (TypeError, ValueError):
+                applied = None
+            if applied is not None and np.isfinite(applied):
+                relevant.append((applied, "segment_stellar_rv_applied_kms"))
+                continue
+        explicit = meta.get("instrument_to_data_removed_velocity_kms")
+        try:
+            explicit = None if explicit is None else float(explicit)
+        except (TypeError, ValueError):
+            explicit = None
+        if explicit is not None and np.isfinite(explicit):
+            relevant.append((explicit, "instrument_to_data_removed_velocity_kms"))
+            continue
+        relevant.append((None, "frame_correction_unavailable"))
+
+    unresolved = [source for value, source in relevant if value is None]
+    if unresolved or not relevant:
+        return {
+            "status": "unresolved",
+            "velocities_kms": [
+                float(value) for value, _source in relevant if value is not None
+            ],
+            "missing": sorted(set(unresolved or ["spectrum_frame_metadata"])),
+            "source": "segment_wavelength_state",
+        }
+    sources = sorted({source for _value, source in relevant})
+    return {
+        "status": "mapped",
+        "velocities_kms": [float(value) for value, _source in relevant],
+        "missing": [],
+        "source": "+".join(sources),
+    }
+
+
+def xshooter_dichroic_mask_catalog(
+    spectrum=None,
+    *,
+    padding_A=0.0,
+    unresolved_policy="warn",
+    unresolved_velocity_margin_kms=500.0,
+):
+    """Return frame-aware X-SHOOTER dichroic/overlap mask metadata.
+
+    The catalog intervals are defined on the instrument/observed wavelength
+    scale. For stellar-rest products such as XSL DR3, the interval is mapped
+    using the recorded per-arm removed velocities. Because each overlap joins
+    two arms, the returned region is the conservative envelope of both mapped
+    intervals.
+
+    ``unresolved_policy='warn'`` returns a labelled approximate warning region
+    expanded by ``unresolved_velocity_margin_kms``. ``'raise'`` refuses to
+    invent a fit mask. ``'conservative'`` returns the expanded region as an
+    explicit opt-in masking interval.
+    """
+    padding_A = float(padding_A)
+    velocity_margin = float(unresolved_velocity_margin_kms)
+    if not np.isfinite(padding_A) or padding_A < 0.0:
+        raise ValueError("padding_A must be finite and >= 0.")
+    if not np.isfinite(velocity_margin) or velocity_margin < 0.0:
+        raise ValueError(
+            "unresolved_velocity_margin_kms must be finite and >= 0."
+        )
+    policy = str(unresolved_policy).strip().lower()
+    if policy not in {"warn", "raise", "conservative"}:
+        raise ValueError(
+            "unresolved_policy must be 'warn', 'raise', or 'conservative'."
+        )
+
+    records = []
+    for catalog_item in XSHOOTER_DICHROIC_MASK_CATALOG:
+        item = dict(catalog_item)
+        lo, hi = map(float, item["instrument_region_A"])
+        if spectrum is None:
+            mapping = {
+                "status": "unresolved",
+                "velocities_kms": [],
+                "missing": ["spectrum"],
+                "source": "no_spectrum_supplied",
+            }
+        else:
+            mapping = _xshooter_region_mapping_velocities(
+                spectrum,
+                item["affected_arms"],
+            )
+        if mapping["status"] == "not_applicable":
+            continue
+
+        if mapping["status"] == "mapped":
+            mapped_intervals = [
+                (
+                    lo / _relativistic_doppler_factor(velocity),
+                    hi / _relativistic_doppler_factor(velocity),
+                )
+                for velocity in mapping["velocities_kms"]
+            ]
+            mapped_lo = min(interval[0] for interval in mapped_intervals)
+            mapped_hi = max(interval[1] for interval in mapped_intervals)
+            mapping_status = (
+                "exact_topocentric"
+                if all(float(value) == 0.0 for value in mapping["velocities_kms"])
+                else "conservative_frame_mapped_envelope"
+            )
+            safe_for_mask = True
+        else:
+            if policy == "raise":
+                raise ValueError(
+                    "Cannot map X-SHOOTER dichroic region {0!r} into the data "
+                    "wavelength frame; missing {1}. Supply explicit frame "
+                    "correction metadata or request unresolved_policy='conservative'."
+                    .format(item["id"], ", ".join(mapping["missing"]))
+                )
+            positive = _relativistic_doppler_factor(velocity_margin)
+            negative = _relativistic_doppler_factor(-velocity_margin)
+            mapped_lo = lo / positive
+            mapped_hi = hi / negative
+            mapping_status = "conservative_unresolved_frame_{0}".format(policy)
+            safe_for_mask = policy == "conservative"
+
+        mapped_lo -= padding_A
+        mapped_hi += padding_A
+        item.update(
+            {
+                "region_A": [float(mapped_lo), float(mapped_hi)],
+                "wavelength_unit": "Angstrom",
+                "source_frame": "xshooter_instrument_observed_wavelength",
+                "target_frame": "data_wavelength_grid",
+                "frame_mapping_status": mapping_status,
+                "frame_mapping_source": mapping["source"],
+                "removed_velocities_kms": list(mapping["velocities_kms"]),
+                "missing_frame_metadata": list(mapping["missing"]),
+                "unresolved_velocity_margin_kms": (
+                    velocity_margin if mapping["status"] != "mapped" else None
+                ),
+                "safe_for_explicit_mask": bool(safe_for_mask),
+                "automatic_reader_default": False,
+                "frame_transform_formula": (
+                    "lambda_data = lambda_instrument / "
+                    "relativistic_doppler_factor(removed_velocity_kms)"
+                ),
+            }
+        )
+        records.append(_json_safe(item))
+    return records
+
+
+def xshooter_dichroic_exclusion_mask(
+    spectrum,
+    *,
+    padding_A=0.0,
+    unresolved_policy="raise",
+    unresolved_velocity_margin_kms=500.0,
+):
+    """Return one explicit frame-aware X-SHOOTER dichroic exclusion mask."""
+    catalog = xshooter_dichroic_mask_catalog(
+        spectrum,
+        padding_A=padding_A,
+        unresolved_policy=unresolved_policy,
+        unresolved_velocity_margin_kms=unresolved_velocity_margin_kms,
+    )
+    unsafe = [item["id"] for item in catalog if not item["safe_for_explicit_mask"]]
+    if unsafe:
+        raise ValueError(
+            "X-SHOOTER dichroic regions are not safe to mask in the current "
+            "wavelength frame: {0}. Use unresolved_policy='conservative' only "
+            "after accepting the recorded velocity-margin assumption."
+            .format(", ".join(unsafe))
+        )
+    regions = [item["region_A"] for item in catalog]
+    quality_flags = sorted(
+        {
+            "xshooter_dichroic_frame_conservative"
+            for item in catalog
+            if str(item["frame_mapping_status"]).startswith("conservative_unresolved")
+        }
+    )
+    return wavelength_region_exclusion_mask(
+        "xshooter:dichroic_regions",
+        regions,
+        metadata={
+            "method": "xshooter_frame_aware_dichroic_catalog",
+            "mask_type": "instrument_product_bad_region",
+            "catalog": catalog,
+            "catalog_ids": [item["id"] for item in catalog],
+            "quality_flags": quality_flags,
+            "automatic_reader_default": False,
+            "action": "masked",
+        },
+    )
+
+
 def archive_mask_catalog(profile="uves_pop"):
     """Return JSON-safe archive/product mask regions for a known profile.
 
@@ -1023,6 +1348,9 @@ def build_mask(
     spectrum=None,
     *,
     archive=False,
+    xshooter_dichroics=False,
+    xshooter_dichroic_padding_A=0.0,
+    xshooter_unresolved_velocity_margin_kms=500.0,
     tellurics="warn",
     nonstellar=False,
     dibs=False,
@@ -1047,6 +1375,13 @@ def build_mask(
         spectrum metadata.  ``"warn"`` records those regions for plotting only.
         Any other string is interpreted as an archive profile name such as
         ``"uves_pop"``.
+    xshooter_dichroics : bool or {"warn", "mask", "conservative"}, optional
+        Opt-in product-specific handling for the documented X-SHOOTER
+        UVB/VIS and VIS/NIR dichroic regions. ``"warn"`` records mapped
+        intervals without masking. ``"mask"`` requires sufficient frame
+        provenance. ``"conservative"`` explicitly accepts a wider interval
+        based on ``xshooter_unresolved_velocity_margin_kms`` when the mapping
+        cannot be established. Readers never apply this mask automatically.
     tellurics : {False, "none", "warn", "mask", "fallback"}, optional
         ``"warn"`` records broad telluric catalog regions only. ``"mask"``
         uses the preferred high-resolution transmission-threshold helper.
@@ -1136,6 +1471,63 @@ def build_mask(
             )
         append_warning_regions(archive_regions, source="archive_product_catalog")
         components.append({"component": "archive", "action": archive_action})
+
+    if xshooter_dichroics is True:
+        xshooter_policy = "mask"
+    elif xshooter_dichroics is False or xshooter_dichroics is None:
+        xshooter_policy = "none"
+    else:
+        xshooter_policy = str(xshooter_dichroics).strip().lower()
+    if xshooter_policy not in {
+        "none",
+        "ignore",
+        "warn",
+        "mask",
+        "conservative",
+    }:
+        raise ValueError(
+            "xshooter_dichroics must be one of none, warn, mask, or conservative."
+        )
+    if xshooter_policy not in {"none", "ignore"}:
+        unresolved_policy = (
+            "conservative" if xshooter_policy == "conservative" else "warn"
+        )
+        catalog = xshooter_dichroic_mask_catalog(
+            spectrum,
+            padding_A=xshooter_dichroic_padding_A,
+            unresolved_policy=unresolved_policy,
+            unresolved_velocity_margin_kms=(
+                xshooter_unresolved_velocity_margin_kms
+            ),
+        )
+        append_warning_regions(catalog, source="xshooter_dichroic_catalog")
+        if xshooter_policy in {"mask", "conservative"}:
+            if spectrum is None:
+                raise ValueError(
+                    "X-SHOOTER dichroic masking requires a spectrum so the "
+                    "wavelength frame can be audited."
+                )
+            append_mask(
+                xshooter_dichroic_exclusion_mask(
+                    spectrum,
+                    padding_A=xshooter_dichroic_padding_A,
+                    unresolved_policy=(
+                        "conservative"
+                        if xshooter_policy == "conservative"
+                        else "raise"
+                    ),
+                    unresolved_velocity_margin_kms=(
+                        xshooter_unresolved_velocity_margin_kms
+                    ),
+                )
+            )
+        components.append(
+            {
+                "component": "xshooter_dichroics",
+                "action": xshooter_policy,
+                "catalog_ids": [item["id"] for item in catalog],
+            }
+        )
 
     if tellurics is True:
         telluric_policy = "mask"
