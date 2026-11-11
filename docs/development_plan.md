@@ -165,7 +165,10 @@ envelope for archival and reviewer-facing products.
 
    - XSL/X-SHOOTER behavior and stability: ingestion, window selection, branch
      proposal, multi-arm behavior, residual morphology, and stress-case
-     recognition.
+     recognition. A matched three-star XSL DR2 sample now provides unchanged
+     UVB/VIS/NIR products for comparison with the same stars in bundled DR3;
+     the next implementation step is a narrow DR2 reader that preserves all
+     arm-specific rest-correction, resolution, flux-loss, and quality metadata.
    - Benchmark accuracy: Gaia FGK Benchmark Stars and other independently
      constrained standards for Teff/logg/[Fe/H]/RV where appropriate.
 
@@ -370,9 +373,9 @@ target is:
   resolution/LSF source are recorded in serialized output;
 - ordinary XSL behavior validation and Gaia benchmark-star accuracy validation
   have been reviewed separately;
-- the bundled Gaia FGK Benchmark Stars subset remains small, cited, checksummed,
-  and used by an audit-first validation runner as comparison data rather than
-  hidden fit priors;
+- the curated 12-star Gaia FGK Benchmark Stars subset remains cited,
+  checksummed, scientifically role-separated, and used by an audit-first
+  validation runner as comparison data rather than hidden fit priors;
 - SDSS/UVES-POP external products can be ingested and audited without bundling
   those data files in the repository;
 - batch quickscan/refine has measured runtime, skip-rate, and false-narrowing

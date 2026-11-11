@@ -134,6 +134,13 @@ effective-resolution provenance.  Spyctres therefore uses the product-specific
 `xsl_dr3` reader and does not apply hidden arm rescaling or another RV
 correction.
 
+`examples/data/xsl_dr2/` contains a separate scientific-validation sample for
+three of the same stars, retaining their original UVB/VIS/NIR arm products.
+These files are not used by Example 7 and must not be treated as merged DR3
+spectra. Their manifest records independent arm rest corrections, resolutions,
+edge caveats, ESO archive identifiers, and checksums while a dedicated XSL DR2
+reader is being implemented.
+
 Example 6 keeps the original UVB/VIS/NIR products separate and shows the
 documented dichroic/overlap intervals as frame-aware warnings. Those warnings
 are not masks unless the caller explicitly requests

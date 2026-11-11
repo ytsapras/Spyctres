@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "description": "Matched XSL DR2 separate-arm sample for multi-arm scientific validation against bundled XSL DR3 spectra.",
+  "source_release": "XSL DR2 / ESO Phase 3",
+  "source_page": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+  "archive_collection": "XSL",
+  "archive_query_service": "https://archive.eso.org/tap_obs",
+  "spyctres_reader_status": "Dedicated XSL DR2 reader not yet registered; preserve these products unchanged until that product-specific reader is implemented.",
+  "citations": [
+    "gonneau2020_xsl_dr2",
+    "eso_xsl_dr2_phase3"
+  ],
+  "product": {
+    "format": "ESO Phase-3 FITS binary table",
+    "columns": [
+      "WAVE",
+      "FLUX",
+      "ERR"
+    ],
+    "wave_unit": "nm",
+    "flux_unit": "erg cm-2 s-1 Angstrom-1",
+    "wave_medium": "air",
+    "wavelength_sampling": "linear within each arm",
+    "stellar_rest_status": "corrected",
+    "fits_spectral_system": "SOURCE",
+    "slit_loss_correction": "All nine selected products have LOSS_COR=true.",
+    "resolution": "Use each file's SPEC_RES header value; the arms are not assigned one common resolving power.",
+    "mask_policy": "Retain finite WAVE/FLUX/ERR samples with positive ERR, honor per-arm WMIN and quality keywords, and apply explicit science masks for dichroic/telluric/edge regions.",
+    "combination_policy": "Do not stitch or rescale these files on ingestion. Preserve UVB, VIS, and NIR as separate segments with their own continuum and resolution metadata.",
+    "known_caveats": [
+      "REST_VAL was measured separately by arm; inter-arm differences can exceed 10 km/s.",
+      "UVB is often unreliable near 350 nm and 545-550 nm.",
+      "VIS is often unreliable near 540-590 nm and beyond 970 nm.",
+      "NIR can be unreliable below 1050 nm, near strong telluric bands, and around the 2.25 micron order join."
+    ]
+  },
+  "targets": [
+    {
+      "xsl_id": "X0379",
+      "name": "HD 119802",
+      "spectral_type": "K3V",
+      "matched_dr3_file": "../xsl_spectrum_X0379_merged.fits",
+      "reference": {
+        "teff_K": 4638.0,
+        "logg_dex": 4.69,
+        "feh_dex": -0.01,
+        "source": "arentsen2019_xsl_parameters"
+      },
+      "notes": "Strong arm-to-arm REST_VAL disagreement makes this a useful residual-alignment diagnostic.",
+      "arms": [
+        {
+          "arm": "UVB",
+          "file": "xsl_spectrum_X0379_uvb_eso.fits",
+          "sha256": "b37dff9ce4c984f369bb8a3434eecf3eccc7b17a0169c6427647bfd93af83506",
+          "eso_dp_id": "ADP.2020-07-28T07:32:26.867",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:26.867",
+          "n_pixels": 17140,
+          "wave_range_nm": [298.8803405761719, 555.9441528320312],
+          "spec_res_R": 9879.627334,
+          "snr_header": 29.89,
+          "rest_val_kms": 0.78,
+          "bary_cor_kms": -23.949,
+          "wmin_useful_nm": 320.0
+        },
+        {
+          "arm": "VIS",
+          "file": "xsl_spectrum_X0379_vis_eso.fits",
+          "sha256": "a40d3fa7d52ce25c3b1cf708a78d4e919690fb1bd8759c32771d62010e9c7a38",
+          "eso_dp_id": "ADP.2020-07-28T07:32:26.868",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:26.868",
+          "n_pixels": 32423,
+          "wave_range_nm": [533.6568603515625, 1019.9749145507812],
+          "spec_res_R": 10690.728351,
+          "snr_header": 70.64,
+          "rest_val_kms": -16.57,
+          "bary_cor_kms": -23.949,
+          "wmin_useful_nm": 540.0
+        },
+        {
+          "arm": "NIR",
+          "file": "xsl_spectrum_X0379_nir_eso.fits",
+          "sha256": "27caf6ab0f4ecd1140bd2553c6d70bae4c81700f22806e95f864ca7c69b8d80c",
+          "eso_dp_id": "ADP.2020-07-28T07:32:26.866",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:26.866",
+          "n_pixels": 24750,
+          "wave_range_nm": [993.9906616210938, 2478.88671875],
+          "spec_res_R": 7681.021718,
+          "snr_header": 69.42,
+          "rest_val_kms": -15.1,
+          "bary_cor_kms": -23.949
+        }
+      ]
+    },
+    {
+      "xsl_id": "X0646",
+      "name": "HD 175058",
+      "spectral_type": "A5IV",
+      "matched_dr3_file": "../xsl_spectrum_X0646_merged.fits",
+      "reference": {
+        "teff_K": 7862.0,
+        "logg_dex": 3.01,
+        "feh_dex": -0.27,
+        "source": "arentsen2019_xsl_parameters"
+      },
+      "notes": "Warm-star standard with high S/N in all three arms.",
+      "arms": [
+        {
+          "arm": "UVB",
+          "file": "xsl_spectrum_X0646_uvb_eso.fits",
+          "sha256": "7e0a247b6e3d5e3c347643dc4d5b5b326133549adcb22434186340a1c5ab8030",
+          "eso_dp_id": "ADP.2020-07-28T07:32:27.608",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:27.608",
+          "n_pixels": 17140,
+          "wave_range_nm": [298.944091796875, 556.062744140625],
+          "spec_res_R": 9858.054672,
+          "snr_header": 112.08,
+          "rest_val_kms": -10.84,
+          "bary_cor_kms": 28.369,
+          "wmin_useful_nm": 300.0
+        },
+        {
+          "arm": "VIS",
+          "file": "xsl_spectrum_X0646_vis_eso.fits",
+          "sha256": "0615b93ba8c960b8cc9b66f9edfb83668c5eeb518c766db7a84b91b6fefad079",
+          "eso_dp_id": "ADP.2020-07-28T07:32:27.609",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:27.609",
+          "n_pixels": 32423,
+          "wave_range_nm": [533.721923828125, 1020.0991821289062],
+          "spec_res_R": 10645.655911,
+          "snr_header": 114.78,
+          "rest_val_kms": -0.78,
+          "bary_cor_kms": 28.369,
+          "wmin_useful_nm": 540.0
+        },
+        {
+          "arm": "NIR",
+          "file": "xsl_spectrum_X0646_nir_eso.fits",
+          "sha256": "6c498fd7190267d7ed46efb8f5f9a30239a882626221d4d7e55a04c13acf21a8",
+          "eso_dp_id": "ADP.2020-07-28T07:32:27.607",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:27.607",
+          "n_pixels": 24750,
+          "wave_range_nm": [994.147216796875, 2479.277099609375],
+          "spec_res_R": 7520.040321,
+          "snr_header": 124.0,
+          "rest_val_kms": -9.989,
+          "bary_cor_kms": 28.369
+        }
+      ]
+    },
+    {
+      "xsl_id": "X0900",
+      "name": "HD 110885",
+      "spectral_type": "F3V",
+      "matched_dr3_file": "../xsl_spectrum_X0900_merged.fits",
+      "reference": {
+        "teff_K": 5616.0,
+        "logg_dex": 2.66,
+        "feh_dex": -1.07,
+        "source": "arentsen2019_xsl_parameters"
+      },
+      "notes": "Keep as a reference-check case: the literature F3V type and tabulated low gravity are inconsistent enough to warrant review.",
+      "arms": [
+        {
+          "arm": "UVB",
+          "file": "xsl_spectrum_X0900_uvb_eso.fits",
+          "sha256": "ddfa4a3d3824feda1a5b81f8cac3c2be563df440503ee2803235168407d09a87",
+          "eso_dp_id": "ADP.2020-07-28T07:32:28.304",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:28.304",
+          "n_pixels": 17140,
+          "wave_range_nm": [298.97723388671875, 556.1243896484375],
+          "spec_res_R": 9780.042358,
+          "snr_header": 85.94,
+          "rest_val_kms": -46.53,
+          "bary_cor_kms": 25.91,
+          "wmin_useful_nm": 320.0
+        },
+        {
+          "arm": "VIS",
+          "file": "xsl_spectrum_X0900_vis_eso.fits",
+          "sha256": "a2b2820fd597fa6450e2ca9e606964d2a13837825cee304db8795a1e5edf7eac",
+          "eso_dp_id": "ADP.2020-07-28T07:32:28.305",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:28.305",
+          "n_pixels": 32423,
+          "wave_range_nm": [533.8046875, 1020.2574462890625],
+          "spec_res_R": 10646.268814,
+          "snr_header": 77.78,
+          "rest_val_kms": -49.73,
+          "bary_cor_kms": 25.91,
+          "wmin_useful_nm": 540.0
+        },
+        {
+          "arm": "NIR",
+          "file": "xsl_spectrum_X0900_nir_eso.fits",
+          "sha256": "3e25d57f3a60b8e6bd1c527389a454a308d8b253cf3fd2c1feec52ec4bdebf77",
+          "eso_dp_id": "ADP.2020-07-28T07:32:28.303",
+          "source_url": "https://dataportal.eso.org/dataPortal/file/ADP.2020-07-28T07:32:28.303",
+          "n_pixels": 24750,
+          "wave_range_nm": [994.2227172851562, 2479.465576171875],
+          "spec_res_R": 8122.593794,
+          "snr_header": 103.6,
+          "rest_val_kms": -35.211,
+          "bary_cor_kms": 25.91
+        }
+      ]
+    }
+  ]
+}

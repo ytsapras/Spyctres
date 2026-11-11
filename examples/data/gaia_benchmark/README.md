@@ -1,9 +1,18 @@
 # Gaia FGK Benchmark Stars example subset
 
-This directory contains a deliberately small subset of the public Gaia FGK
-Benchmark Stars Library for Spyctres validation examples. The files are the
-R=42,000, continuum-normalized HARPS text products from the 2025/GBSv3 web
-library, kept as `.txt.gz` so the repository does not grow unnecessarily.
+This directory contains a curated subset of the public Gaia FGK Benchmark
+Stars Library for Spyctres validation examples. The files are R=42,000,
+continuum-normalized text products from the 2025/GBSv3 web library, kept as
+`.txt.gz` so the repository does not grow unnecessarily. The original source
+spectra come from HARPS, HERMES, ESPaDOnS, NARVAL, and UVES, but the products
+bundled here share the same library wavelength grid and resolving power.
+
+The 12-star subset deliberately separates eight ordinary standards from four
+flagged or stress cases in `manifest.json`. It now covers F/G/K dwarfs,
+subgiants, and giants, including cool, metal-rich, and metal-poor regimes.
+`validation_role="standard"` is the only role included in ordinary aggregate
+accuracy statistics by the validation runner; the other cases remain visible
+but are summarized separately.
 
 Use the dedicated reader:
 
@@ -35,7 +44,15 @@ Calibration/provenance summary:
 
 These spectra are meant for external validation of parameter recovery. The
 reference parameters in `manifest.json` are comparison labels, not hidden fit
-priors.
+priors. `source_quality_flag` preserves qualifications from the official GBSv3
+table, including references based on indirect angular diameters.
+
+Verify the local copies against the recorded hashes with:
+
+```bash
+cd examples/data/gaia_benchmark
+sha256sum -c gaia_benchmark_checksums.sha256
+```
 
 For a failure diagnosis, the validation runner can keep the same
 reference-independent parameter bounds while changing only the fitted window

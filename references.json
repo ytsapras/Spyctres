@@ -149,11 +149,36 @@
       "url": "https://doi.org/10.1051/0004-6361/202555211",
       "validated_via": "A&A/DOI metadata, official benchmark-stars page, and downloaded file headers/links",
       "validated_on": "2026-07-24",
-      "description": "Provides the current GBSv3 high-S/N visual spectral library and reference parameters/abundances for FGK benchmark stars. The bundled Spyctres example subset uses its public 480-680 nm HARPS spectra degraded to common R=42000 and normalized flux, with reference parameters recorded only for validation comparison. Spyctres treats the R42KNorm wavelength scale as air in its reader profile based on bundled optical line-center checks, while preserving that this is an empirical product-profile convention because the public web table does not explicitly state air/vacuum.",
+      "description": "Provides the current GBSv3 high-S/N visual spectral library and reference parameters/abundances for FGK benchmark stars. The bundled Spyctres example subset uses public 480-680 nm spectra from several source instruments, degraded to common R=42000 and normalized flux, with reference parameters recorded only for validation comparison. Spyctres treats the R42KNorm wavelength scale as air in its reader profile based on bundled optical line-center checks, while preserving that this is an empirical product-profile convention because the public web table does not explicitly state air/vacuum.",
       "affected_code": [
         "Spyctres/io.py:read_gaia_benchmark_ascii",
         "examples/data/gaia_benchmark/manifest.json",
         "examples/data/gaia_benchmark/README.md"
+      ]
+    },
+    {
+      "id": "gonneau2020_xsl_dr2",
+      "citation": "Gonneau, A. et al. (2020), The X-shooter Spectral Library (XSL): Data Release 2, Astronomy & Astrophysics, 634, A133.",
+      "doi": "10.1051/0004-6361/201936825",
+      "url": "https://doi.org/10.1051/0004-6361/201936825",
+      "validated_via": "A&A publication, official XSL DR2 documentation, ESO Phase-3 release description, and downloaded FITS headers",
+      "validated_on": "2026-11-11",
+      "description": "Defines the XSL DR2 arm-separated, linearly sampled FITS products and their air-wavelength stellar-rest-frame convention. It documents per-arm radial-velocity corrections, flux-loss provenance, quality flags, wavelength-dependent resolution, and the UVB/VIS/NIR edge and dichroic caveats that must be preserved by a product-specific reader and multi-arm validation workflow.",
+      "affected_code": [
+        "examples/data/xsl_dr2/manifest.json",
+        "examples/data/xsl_dr2/README.md"
+      ]
+    },
+    {
+      "id": "eso_xsl_dr2_phase3",
+      "citation": "European Southern Observatory, XSL DR2 Phase-3 data release description and ESO Science Archive products.",
+      "url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+      "validated_via": "Official ESO Phase-3 release description, TAP ObsCore query, DataLink records, and downloaded product headers",
+      "validated_on": "2026-11-11",
+      "description": "Provides the stable archive identifiers and standardized ESO Phase-3 copies of XSL DR2. The bundled matched sample records each ADP identifier, direct archive URL, checksum, arm coverage, resolving power, and rest-frame correction metadata for reproducible retrieval and validation.",
+      "affected_code": [
+        "examples/data/xsl_dr2/manifest.json",
+        "examples/data/xsl_dr2/xsl_dr2_checksums.sha256"
       ]
     },
     {

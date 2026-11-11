@@ -129,8 +129,8 @@ BENCHMARK_WINDOW_SETS = {
         "diagnostic_only": False,
         "description": (
             "Use the reviewed fit setup's recommended Gaia benchmark windows. "
-            "For the bundled HARPS subset this is normally H-beta, Mg I b, "
-            "Na I D, and H-alpha."
+            "For the bundled common-resolution subset this is normally H-beta, "
+            "Mg I b, Na I D, and H-alpha."
         ),
     },
     "hydrogen_only": {
