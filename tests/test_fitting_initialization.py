@@ -12,6 +12,8 @@ from Spyctres.fitting import (
     _default_coarse_grid,
     _full_spectrum_parameter_count,
     _grid_edge_flags,
+    _intersect_optimizer_bounds,
+    _local_grid_boundary_diagnostics,
     _make_forward_segments,
     _legendre_continuum_diagnostics,
     _phoenix_quality_flags,
@@ -149,6 +151,235 @@ def test_internally_selected_phoenix_grid_is_trimmed_to_complete_subgrid():
         "Trimmed local PHOENIX interpolation grid" in str(message)
         for message in messages
     )
+
+
+def test_optimizer_bounds_are_intersected_with_effective_grid_axes():
+    requested = (
+        np.array([4500.0, -1.0, 1.0, -100.0]),
+        np.array([6000.0, 0.5, 5.0, 100.0]),
+    )
+    grid_axes = (
+        np.array([5000.0, 5100.0, 5200.0]),
+        np.array([-0.5, 0.0, 0.5]),
+        np.array([2.5, 3.0, 3.5]),
+    )
+
+    active, restrictions = _intersect_optimizer_bounds(requested, grid_axes)
+
+    assert np.array_equal(active[0], [5000.0, -0.5, 2.5, -100.0])
+    assert np.array_equal(active[1], [5200.0, 0.5, 3.5, 100.0])
+    assert restrictions == {
+        "teff": {"low": True, "high": True},
+        "feh": {"low": True, "high": False},
+        "logg": {"low": True, "high": True},
+    }
+
+
+def test_local_grid_boundary_diagnostics_distinguish_near_and_exact_edges():
+    axes = (
+        np.array([5000.0, 5100.0, 5200.0]),
+        np.array([-0.5, 0.0, 0.5]),
+        np.array([2.5, 3.0, 3.5]),
+    )
+    requested = (
+        np.array([4800.0, -1.0, 1.0, -50.0]),
+        np.array([5400.0, 1.0, 5.0, 50.0]),
+    )
+
+    diagnostic = _local_grid_boundary_diagnostics(
+        [5100.0, 0.0, 2.6, 0.0],
+        axes,
+        requested,
+        edge_fraction=0.25,
+    )
+
+    assert diagnostic["parameters"]["logg"]["near_low"] is True
+    assert diagnostic["parameters"]["logg"]["expand_low"] is True
+    assert diagnostic["exact_edge_flags"]["logg_low"] is False
+    assert diagnostic["parameters"]["teff"]["near_low"] is False
+    assert diagnostic["parameters"]["teff"]["near_high"] is False
+
+
+def _local_grid_test_flux(wave, teff, feh, logg):
+    wave = np.asarray(wave, dtype=float)
+    teff_depth = 0.08 + (float(teff) - 5000.0) / 10000.0
+    feh_depth = 0.10 + (float(feh) + 0.5) * 0.10
+    logg_depth = 0.06 + (float(logg) - 1.5) * 0.06
+    return (
+        1.0
+        - teff_depth * np.exp(-0.5 * ((wave - 5020.0) / 0.7) ** 2)
+        - feh_depth * np.exp(-0.5 * ((wave - 5050.0) / 0.8) ** 2)
+        - logg_depth * np.exp(-0.5 * ((wave - 5080.0) / 0.9) ** 2)
+    )
+
+
+class _ExpandableLocalGridLibrary:
+    DEFAULT_TEFF_GRID = np.array([4900.0, 5000.0, 5100.0, 5200.0, 5300.0])
+    DEFAULT_FEH_GRID = np.array([-0.5, 0.0, 0.5])
+    DEFAULT_LOGG_GRID = np.array([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
+
+    def __init__(self, installed_logg=None):
+        self._grid = None
+        self.wave = None
+        self.build_count = 0
+        self.installed_logg = np.asarray(
+            self.DEFAULT_LOGG_GRID if installed_logg is None else installed_logg,
+            dtype=float,
+        )
+
+    def available_axes(self):
+        return (
+            self.DEFAULT_TEFF_GRID,
+            self.DEFAULT_FEH_GRID,
+            self.installed_logg,
+        )
+
+    def complete_subgrid(self, teff_grid, feh_grid, logg_grid):
+        logg = np.asarray(logg_grid, dtype=float)
+        if not np.all(np.isin(logg, self.installed_logg)):
+            logg = logg[np.isin(logg, self.installed_logg)]
+        if logg.size < 2:
+            raise ValueError("No complete fake logg subgrid")
+        return (
+            np.asarray(teff_grid, dtype=float),
+            np.asarray(feh_grid, dtype=float),
+            logg,
+        )
+
+    def interpolator_matches(
+        self,
+        observed_wave,
+        teff_grid,
+        feh_grid,
+        logg_grid,
+        **kwargs,
+    ):
+        if self._grid is None or self.wave is None:
+            return False
+        return bool(
+            np.array_equal(self.wave, np.asarray(observed_wave, dtype=float))
+            and all(
+                np.array_equal(old, np.asarray(new, dtype=float))
+                for old, new in zip(
+                    self._grid,
+                    (teff_grid, feh_grid, logg_grid),
+                )
+            )
+        )
+
+    def build_interpolator(
+        self,
+        observed_wave,
+        teff_grid,
+        feh_grid,
+        logg_grid,
+        **kwargs,
+    ):
+        self.wave = np.asarray(observed_wave, dtype=float)
+        self._grid = tuple(
+            np.asarray(axis, dtype=float)
+            for axis in (teff_grid, feh_grid, logg_grid)
+        )
+        self.build_count += 1
+
+    def evaluate(self, teff, feh, logg):
+        values = (float(teff), float(feh), float(logg))
+        if self._grid is None or any(
+            value < axis[0] or value > axis[-1]
+            for value, axis in zip(values, self._grid)
+        ):
+            raise ValueError("point outside fake interpolation grid")
+        return _local_grid_test_flux(self.wave, *values)
+
+
+def _run_expandable_local_grid_fit(
+    truth_logg,
+    library=None,
+    explicit=False,
+):
+    wave = np.linspace(5000.0, 5100.0, 501)
+    truth = (5100.0, 0.0, float(truth_logg))
+    segment = SpectrumSegment(
+        wave,
+        _local_grid_test_flux(wave, *truth),
+        err=np.full(wave.size, 0.002),
+        wave_medium="vacuum",
+        name="local-grid-recovery",
+    )
+    library = _ExpandableLocalGridLibrary() if library is None else library
+    kwargs = {}
+    if explicit:
+        kwargs.update(
+            teff_grid=[4900.0, 5000.0, 5100.0, 5200.0, 5300.0],
+            feh_grid=[-0.5, 0.0, 0.5],
+            logg_grid=[2.5, 3.0, 3.5],
+        )
+    result = fit_phoenix_full_spectrum(
+        segment,
+        phoenix_lib=library,
+        p0=(5100.0, 0.0, 3.0, 0.0),
+        bounds=((4900.0, -0.5, 1.5, -1.0), (5300.0, 0.5, 4.0, 1.0)),
+        mdeg=0,
+        rv_init=None,
+        multistart=1,
+        max_nfev=100,
+        forward_model="interp_observed",
+        **kwargs,
+    )
+    return result, library
+
+
+def test_internal_local_grid_expands_twice_and_recovers_low_gravity():
+    result, library = _run_expandable_local_grid_fit(1.8)
+
+    coverage = result["search_coverage"]
+    assert result["logg"] == pytest.approx(1.8, abs=0.03)
+    assert result["invalid_model_evaluations"] == 0
+    assert library.build_count == 3
+    assert coverage["expansion_count"] == 2
+    assert coverage["stop_reason"] == "interior_solution"
+    assert coverage["incomplete"] is False
+    assert "local_grid_expanded" in result["quality_flags"]
+    assert "incomplete_search_coverage" not in result["quality_flags"]
+
+
+def test_explicit_local_grid_is_not_expanded_and_restriction_is_flagged():
+    result, library = _run_expandable_local_grid_fit(1.8, explicit=True)
+
+    coverage = result["search_coverage"]
+    assert result["logg"] == pytest.approx(2.5, abs=1e-4)
+    assert result["invalid_model_evaluations"] == 0
+    assert library.build_count == 1
+    assert coverage["expansion_count"] == 0
+    assert coverage["stop_reason"] == "explicit_grid_fixed"
+    assert coverage["explicit_grid_restricts_requested_bounds"] is True
+    assert coverage["incomplete"] is True
+    assert "explicit_grid_restricts_requested_bounds" in result["quality_flags"]
+    assert "incomplete_search_coverage" in result["quality_flags"]
+
+
+def test_internal_local_grid_does_not_expand_for_interior_solution():
+    result, library = _run_expandable_local_grid_fit(3.0)
+
+    coverage = result["search_coverage"]
+    assert result["logg"] == pytest.approx(3.0, abs=0.03)
+    assert library.build_count == 1
+    assert coverage["expansion_count"] == 0
+    assert coverage["stop_reason"] == "interior_solution"
+
+
+def test_installed_grid_boundary_stops_and_flags_incomplete_coverage():
+    library = _ExpandableLocalGridLibrary(installed_logg=[2.5, 3.0, 3.5])
+    result, library = _run_expandable_local_grid_fit(1.8, library=library)
+
+    coverage = result["search_coverage"]
+    assert result["logg"] == pytest.approx(2.5, abs=1e-4)
+    assert library.build_count == 1
+    assert coverage["stop_reason"] == "installed_grid_boundary"
+    assert coverage["installed_grid_boundary"] is True
+    assert coverage["incomplete"] is True
+    assert "installed_grid_boundary" in result["quality_flags"]
+    assert "incomplete_search_coverage" in result["quality_flags"]
 
 
 def test_local_multistarts_are_deterministic_and_inside_bounds():

@@ -840,6 +840,30 @@ QUALITY_FLAG_DESCRIPTIONS = {
         "At least one fitted physical parameter lies on an allowed grid or fit "
         "boundary."
     ),
+    "local_grid_expanded": (
+        "The internally selected PHOENIX interpolation grid was expanded and "
+        "the local optimizer was restarted after an edge-near solution."
+    ),
+    "local_grid_boundary_near": (
+        "At least one fitted physical parameter remains close to an edge of "
+        "the final effective PHOENIX interpolation grid."
+    ),
+    "explicit_grid_restricts_requested_bounds": (
+        "An explicit PHOENIX interpolation grid covers less than the requested "
+        "physical parameter bounds; explicit grids are not expanded silently."
+    ),
+    "installed_grid_boundary": (
+        "The local search reached a PHOENIX grid edge with no farther installed "
+        "node available in the requested direction."
+    ),
+    "incomplete_search_coverage": (
+        "The effective PHOENIX grid did not fully resolve an edge-limited or "
+        "explicitly restricted parameter search."
+    ),
+    "local_grid_boundary_unresolved": (
+        "A near-edge local-grid solution could not be resolved within the "
+        "configured expansion, completeness, or template-budget limits."
+    ),
     "resolution_missing": (
         "At least one fitted segment lacks explicit resolution/LSF metadata."
     ),
@@ -1105,6 +1129,54 @@ QUALITY_FLAG_CLASSIFICATION = {
         "action": (
             "Check which parameter hit a bound and rerun with a wider or more "
             "appropriate grid if the model domain supports it."
+        ),
+    },
+    "local_grid_expanded": {
+        "severity": "info",
+        "category": "model_grid",
+        "action": (
+            "Review search_coverage history and confirm that the final solution "
+            "is interior and stable."
+        ),
+    },
+    "local_grid_boundary_near": {
+        "severity": "advisory",
+        "category": "model_grid",
+        "action": (
+            "Inspect the final edge distance and expansion stopping reason in "
+            "search_coverage."
+        ),
+    },
+    "explicit_grid_restricts_requested_bounds": {
+        "severity": "review",
+        "category": "model_grid",
+        "action": (
+            "Supply a wider complete explicit grid or remove explicit axes to "
+            "allow bounded automatic local-grid expansion."
+        ),
+    },
+    "installed_grid_boundary": {
+        "severity": "review",
+        "category": "model_grid",
+        "action": (
+            "Install the required PHOENIX nodes or narrow the scientific search "
+            "domain before interpreting the edge-limited parameters."
+        ),
+    },
+    "incomplete_search_coverage": {
+        "severity": "review",
+        "category": "model_grid",
+        "action": (
+            "Treat the recovered parameters as incomplete and inspect the "
+            "recorded grid history and stopping reason."
+        ),
+    },
+    "local_grid_boundary_unresolved": {
+        "severity": "review",
+        "category": "model_grid",
+        "action": (
+            "Increase the bounded expansion/template budget only after checking "
+            "grid completeness and scientific parameter bounds."
         ),
     },
     "resolution_missing": {

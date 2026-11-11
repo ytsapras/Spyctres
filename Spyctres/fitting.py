@@ -1049,6 +1049,233 @@ def _grid_edge_flags(best, grid_summary, rtol=0.0, atol=1e-8):
     return flags
 
 
+def _grid_axes_summary(grid_axes):
+    """Return JSON-safe summaries for Teff, [Fe/H], and logg axes."""
+    summary = {}
+    for label, values in zip(("teff", "feh", "logg"), grid_axes):
+        axis = np.unique(np.asarray(values, dtype=float))
+        finite = axis[np.isfinite(axis)]
+        if finite.size == 0:
+            raise ValueError("PHOENIX interpolation axes must contain finite values.")
+        summary[label] = {
+            "min": float(finite[0]),
+            "max": float(finite[-1]),
+            "n": int(finite.size),
+            "values": finite.tolist(),
+        }
+    return summary
+
+
+def _bounds_to_metadata(bounds):
+    """Return named, JSON-safe lower/upper parameter bounds."""
+    lower = np.asarray(bounds[0], dtype=float)
+    upper = np.asarray(bounds[1], dtype=float)
+    return {
+        label: {"min": float(lo), "max": float(hi)}
+        for label, lo, hi in zip(
+            ("teff", "feh", "logg", "rv_kms"), lower, upper
+        )
+    }
+
+
+def _intersect_optimizer_bounds(requested_bounds, grid_axes):
+    """Restrict physical optimizer bounds to the effective interpolation cube.
+
+    The requested bounds describe the user's physical search domain.  The
+    returned active bounds describe what the current interpolator can safely
+    evaluate.  RV is unaffected because it is not a PHOENIX grid coordinate.
+    """
+    requested_lower = np.asarray(requested_bounds[0], dtype=float)
+    requested_upper = np.asarray(requested_bounds[1], dtype=float)
+    active_lower = requested_lower.copy()
+    active_upper = requested_upper.copy()
+    restrictions = {}
+
+    for index, (label, values) in enumerate(
+        zip(("teff", "feh", "logg"), grid_axes)
+    ):
+        axis = np.unique(np.asarray(values, dtype=float))
+        axis = axis[np.isfinite(axis)]
+        if axis.size < 2:
+            raise ValueError(
+                "The effective PHOENIX {0} axis must contain at least two "
+                "finite nodes for interpolation.".format(label)
+            )
+        active_lower[index] = max(requested_lower[index], float(axis[0]))
+        active_upper[index] = min(requested_upper[index], float(axis[-1]))
+        if active_upper[index] <= active_lower[index]:
+            raise ValueError(
+                "Requested {0} bounds do not overlap the effective PHOENIX "
+                "interpolation axis.".format(label)
+            )
+        restrictions[label] = {
+            "low": bool(active_lower[index] > requested_lower[index]),
+            "high": bool(active_upper[index] < requested_upper[index]),
+        }
+
+    return (active_lower, active_upper), restrictions
+
+
+def _local_grid_boundary_diagnostics(
+    best,
+    grid_axes,
+    requested_bounds,
+    edge_fraction=0.25,
+):
+    """Describe exact and near-edge solutions on an effective local grid."""
+    best = np.asarray(best, dtype=float)
+    requested_lower = np.asarray(requested_bounds[0], dtype=float)
+    requested_upper = np.asarray(requested_bounds[1], dtype=float)
+    grid_summary = _grid_axes_summary(grid_axes)
+    exact_flags = _grid_edge_flags(best, grid_summary)
+    parameters = {}
+    any_near = False
+    any_expandable = False
+
+    for index, (label, values) in enumerate(
+        zip(("teff", "feh", "logg"), grid_axes)
+    ):
+        axis = np.unique(np.asarray(values, dtype=float))
+        axis = axis[np.isfinite(axis)]
+        low_spacing = float(axis[1] - axis[0])
+        high_spacing = float(axis[-1] - axis[-2])
+        low_distance_nodes = float((best[index] - axis[0]) / low_spacing)
+        high_distance_nodes = float((axis[-1] - best[index]) / high_spacing)
+        near_low = bool(low_distance_nodes <= float(edge_fraction) + 1e-12)
+        near_high = bool(high_distance_nodes <= float(edge_fraction) + 1e-12)
+        requested_extension_low = bool(requested_lower[index] < axis[0])
+        requested_extension_high = bool(requested_upper[index] > axis[-1])
+        expand_low = bool(near_low and requested_extension_low)
+        expand_high = bool(near_high and requested_extension_high)
+        any_near = bool(any_near or near_low or near_high)
+        any_expandable = bool(any_expandable or expand_low or expand_high)
+        parameters[label] = {
+            "value": float(best[index]),
+            "grid_min": float(axis[0]),
+            "grid_max": float(axis[-1]),
+            "low_spacing": low_spacing,
+            "high_spacing": high_spacing,
+            "distance_from_low_nodes": low_distance_nodes,
+            "distance_from_high_nodes": high_distance_nodes,
+            "near_low": near_low,
+            "near_high": near_high,
+            "requested_extension_low": requested_extension_low,
+            "requested_extension_high": requested_extension_high,
+            "expand_low": expand_low,
+            "expand_high": expand_high,
+        }
+
+    return {
+        "edge_fraction": float(edge_fraction),
+        "exact_edge_flags": exact_flags,
+        "parameters": parameters,
+        "any_near_edge": any_near,
+        "any_expandable_edge": any_expandable,
+    }
+
+
+def _expand_local_grid_axes(
+    phoenix_lib,
+    grid_axes,
+    boundary_diagnostics,
+    max_templates=300,
+):
+    """Try to add one installed node layer at the requested local-grid edges."""
+    labels = ("teff", "feh", "logg")
+    current_axes = tuple(
+        np.unique(np.asarray(values, dtype=float)) for values in grid_axes
+    )
+    if hasattr(phoenix_lib, "available_axes"):
+        installed_axes = tuple(
+            np.unique(np.asarray(values, dtype=float))
+            for values in phoenix_lib.available_axes()
+        )
+        installed_source = "available_axes"
+    else:
+        installed_axes = tuple(
+            np.unique(
+                np.asarray(
+                    getattr(phoenix_lib, "DEFAULT_{0}_GRID".format(label.upper())),
+                    dtype=float,
+                )
+            )
+            for label in labels
+        )
+        installed_source = "default_axes"
+
+    proposed_axes = []
+    attempted = []
+    unavailable = []
+    for label, current, installed in zip(labels, current_axes, installed_axes):
+        info = boundary_diagnostics["parameters"][label]
+        proposed = current.copy()
+        if info["expand_low"]:
+            candidates = installed[installed < current[0]]
+            if candidates.size:
+                value = float(candidates[-1])
+                proposed = np.append(proposed, value)
+                attempted.append({"parameter": label, "side": "low", "node": value})
+            else:
+                unavailable.append({"parameter": label, "side": "low"})
+        if info["expand_high"]:
+            candidates = installed[installed > current[-1]]
+            if candidates.size:
+                value = float(candidates[0])
+                proposed = np.append(proposed, value)
+                attempted.append({"parameter": label, "side": "high", "node": value})
+            else:
+                unavailable.append({"parameter": label, "side": "high"})
+        proposed_axes.append(np.unique(proposed))
+
+    metadata = {
+        "installed_axes_source": installed_source,
+        "installed_axes": _grid_axes_summary(installed_axes),
+        "attempted_nodes": attempted,
+        "unavailable_edges": unavailable,
+    }
+    if not attempted:
+        metadata["reason"] = "installed_grid_boundary"
+        return current_axes, False, metadata
+
+    proposed_count = int(np.prod([axis.size for axis in proposed_axes]))
+    metadata["proposed_template_count"] = proposed_count
+    if proposed_count > int(max_templates):
+        metadata["reason"] = "template_budget"
+        return current_axes, False, metadata
+
+    completed_axes = tuple(proposed_axes)
+    if hasattr(phoenix_lib, "complete_subgrid"):
+        try:
+            completed_axes = tuple(
+                np.unique(np.asarray(values, dtype=float))
+                for values in phoenix_lib.complete_subgrid(*proposed_axes)
+            )
+        except ValueError:
+            metadata["reason"] = "incomplete_subgrid"
+            return current_axes, False, metadata
+
+    preserves_current = all(
+        np.all(np.isin(current, completed))
+        for current, completed in zip(current_axes, completed_axes)
+    )
+    added = any(
+        completed.size > current.size
+        for current, completed in zip(current_axes, completed_axes)
+    )
+    completed_count = int(np.prod([axis.size for axis in completed_axes]))
+    metadata["completed_template_count"] = completed_count
+    if not preserves_current or not added:
+        metadata["reason"] = "incomplete_subgrid"
+        return current_axes, False, metadata
+    if completed_count > int(max_templates):
+        metadata["reason"] = "template_budget"
+        return current_axes, False, metadata
+
+    metadata["reason"] = "expanded"
+    metadata["effective_axes"] = _grid_axes_summary(completed_axes)
+    return completed_axes, True, metadata
+
+
 def _unique_metadata_value(segments, attribute):
     values = _metadata_values(segments, attribute)
     unique = sorted(set(values))
@@ -1403,6 +1630,7 @@ def _build_phoenix_fit_diagnostics(
     error_floor_applied=False,
     parameter_errors_available=None,
     continuum_diagnostics=None,
+    search_coverage=None,
 ):
     """Build a compact, JSON-safe diagnostics block for PHOENIX fits."""
     retained_count = int(len(seg_meta))
@@ -1622,6 +1850,7 @@ def _build_phoenix_fit_diagnostics(
         "segment_diagnostics": segment_diagnostics,
         "grid_summary": grid_summary,
         "grid_edge_flags": edge_flags,
+        "search_coverage": dict(search_coverage or {}),
         "rv_start_values": [
             float(solution["start"][3])
             for solution in local_solution_summaries
@@ -1704,6 +1933,19 @@ def _phoenix_quality_flags(diagnostics, success=True, high_chi2_threshold=5.0):
                 flags.append("grid_edge_{0}_{1}".format(label, side))
     if edge_flags.get("fit_bound_hit"):
         flags.append("fit_bound_hit")
+    search_coverage = diagnostics.get("search_coverage", {})
+    if search_coverage.get("expanded"):
+        flags.append("local_grid_expanded")
+    if search_coverage.get("near_grid_edge"):
+        flags.append("local_grid_boundary_near")
+    if search_coverage.get("explicit_grid_restricts_requested_bounds"):
+        flags.append("explicit_grid_restricts_requested_bounds")
+    if search_coverage.get("installed_grid_boundary"):
+        flags.append("installed_grid_boundary")
+    if search_coverage.get("incomplete"):
+        flags.append("incomplete_search_coverage")
+    if search_coverage.get("boundary_unresolved"):
+        flags.append("local_grid_boundary_unresolved")
     if diagnostics.get("resolution_metadata_summary", {}).get("missing_count", 0) > 0:
         flags.append("resolution_missing")
     resolution = diagnostics.get("resolution_metadata_summary", {})
@@ -2990,6 +3232,11 @@ def fit_phoenix_full_spectrum(
     teff_grid=None,
     feh_grid=None,
     logg_grid=None,
+    local_grid_policy="auto",
+    local_grid_max_expansions=2,
+    local_grid_edge_fraction=0.25,
+    local_grid_max_templates=300,
+    local_grid_min_relative_improvement=1e-6,
     cache_path=None,
     allow_missing=False,
     physical_init=None,
@@ -3123,7 +3370,29 @@ def fit_phoenix_full_spectrum(
         
     teff_grid, feh_grid, logg_grid : array-like, optional
         PHOENIX parameter grids to use when building the interpolator. If not
-        provided, defaults are chosen by the caller or PHOENIX helper logic.
+        provided, compact local axes are selected around the initial physical
+        parameters. Explicit axes remain fixed and are never expanded
+        automatically.
+
+    local_grid_policy : {"auto", "fixed"}, optional
+        Policy for internally selected local interpolation grids. ``"auto"``
+        grows a local grid by at most one installed node layer per restart when
+        the solution lies near an edge and the requested physical bounds extend
+        beyond it. ``"fixed"`` disables those restarts. Explicit ``teff_grid``,
+        ``feh_grid``, or ``logg_grid`` values always imply fixed-grid semantics.
+
+    local_grid_max_expansions : int, optional
+        Maximum number of bounded local-grid expansion/restart cycles.
+
+    local_grid_edge_fraction : float, optional
+        Edge proximity threshold in units of the adjacent grid-node spacing.
+
+    local_grid_max_templates : int, optional
+        Maximum rectangular template count allowed after automatic expansion.
+
+    local_grid_min_relative_improvement : float, optional
+        Stop expanding when an expanded-grid restart remains near an expandable
+        edge but improves chi-square by less than this relative amount.
 
     cache_path : str, optional
         Path to an `.npz` cache file for the PHOENIX interpolator built on the
@@ -3231,6 +3500,28 @@ def fit_phoenix_full_spectrum(
     multistart = int(multistart)
     if multistart < 1:
         raise ValueError("multistart must be >= 1.")
+    local_grid_policy = str(local_grid_policy).lower()
+    if local_grid_policy not in ("auto", "fixed"):
+        raise ValueError("local_grid_policy must be 'auto' or 'fixed'.")
+    local_grid_max_expansions = int(local_grid_max_expansions)
+    if local_grid_max_expansions < 0:
+        raise ValueError("local_grid_max_expansions must be >= 0.")
+    local_grid_edge_fraction = float(local_grid_edge_fraction)
+    if not np.isfinite(local_grid_edge_fraction) or local_grid_edge_fraction < 0.0:
+        raise ValueError("local_grid_edge_fraction must be finite and >= 0.")
+    local_grid_max_templates = int(local_grid_max_templates)
+    if local_grid_max_templates < 8:
+        raise ValueError("local_grid_max_templates must be >= 8.")
+    local_grid_min_relative_improvement = float(
+        local_grid_min_relative_improvement
+    )
+    if (
+        not np.isfinite(local_grid_min_relative_improvement)
+        or local_grid_min_relative_improvement < 0.0
+    ):
+        raise ValueError(
+            "local_grid_min_relative_improvement must be finite and >= 0."
+        )
     rv_grid_n = int(rv_grid_n)
     if rv_grid_n < 2:
         raise ValueError("rv_grid_n must be >= 2.")
@@ -3440,34 +3731,52 @@ def fit_phoenix_full_spectrum(
                 },
             )
 
-    if not phoenix_lib.interpolator_matches(
-        model_wave_grid,
-        teff_grid_req,
-        feh_grid_req,
-        logg_grid_req,
-        observed_wave_medium=model_wave_medium,
-    ):
-        report("Preparing PHOENIX interpolator/cache.", phase="phoenix_cache")
-        phoenix_lib.build_interpolator(
-            observed_wave=model_wave_grid,
-            teff_grid=teff_grid_req,
-            feh_grid=feh_grid_req,
-            logg_grid=logg_grid_req,
-            cache_path=cache_path,
-            allow_missing=allow_missing,
+    effective_grid_axes = tuple(
+        np.unique(np.asarray(values, dtype=float))
+        for values in (teff_grid_req, feh_grid_req, logg_grid_req)
+    )
+    initial_grid_axes = tuple(axis.copy() for axis in effective_grid_axes)
+
+    def _prepare_phoenix_interpolator(grid_axes, expansion_index=0):
+        teff_axis, feh_axis, logg_axis = grid_axes
+        if not phoenix_lib.interpolator_matches(
+            model_wave_grid,
+            teff_axis,
+            feh_axis,
+            logg_axis,
             observed_wave_medium=model_wave_medium,
-            progress_callback=lambda event: _report_phoenix_progress_event(
-                report,
-                event,
-            ),
-        )
-    else:
-        report(
-            "Reusing existing in-memory PHOENIX interpolator.",
-            phase="phoenix_cache",
-        )
-    
-    # Set default bounds from the interpolator grid if none supplied
+        ):
+            if expansion_index:
+                message = (
+                    "Rebuilding PHOENIX interpolator after local-grid "
+                    "expansion {0}.".format(expansion_index)
+                )
+            else:
+                message = "Preparing PHOENIX interpolator/cache."
+            report(message, phase="phoenix_cache")
+            phoenix_lib.build_interpolator(
+                observed_wave=model_wave_grid,
+                teff_grid=teff_axis,
+                feh_grid=feh_axis,
+                logg_grid=logg_axis,
+                cache_path=cache_path,
+                allow_missing=allow_missing,
+                observed_wave_medium=model_wave_medium,
+                progress_callback=lambda event: _report_phoenix_progress_event(
+                    report,
+                    event,
+                ),
+            )
+        else:
+            report(
+                "Reusing existing in-memory PHOENIX interpolator.",
+                phase="phoenix_cache",
+            )
+
+    _prepare_phoenix_interpolator(effective_grid_axes)
+
+    # Requested bounds express the intended physical search. Each optimizer
+    # run below receives their intersection with the current interpolator.
     if bounds is None:
         bounds = (
             (
@@ -3495,7 +3804,17 @@ def fit_phoenix_full_spectrum(
         raise ValueError(
             "bounds must be two finite four-element arrays with lower < upper."
         )
-    bounds = (lower_bounds, upper_bounds)
+    requested_bounds = (lower_bounds, upper_bounds)
+    active_bounds, initial_bound_restrictions = _intersect_optimizer_bounds(
+        requested_bounds,
+        effective_grid_axes,
+    )
+    initial_physical = np.clip(
+        np.asarray([teff0, feh0, logg0], dtype=float),
+        active_bounds[0][:3],
+        active_bounds[1][:3],
+    )
+    teff0, feh0, logg0 = map(float, initial_physical)
         
     broadening_fwhm_kms = _resolve_broadening_fwhm_kms(R=R, fwhm_kms=fwhm_kms)
     
@@ -3617,7 +3936,7 @@ def fit_phoenix_full_spectrum(
     
     # RV initialization by coarse grid scan (optional)
     if rv_init == "grid":
-        rv_lo, rv_hi = float(bounds[0][3]), float(bounds[1][3])
+        rv_lo, rv_hi = float(active_bounds[0][3]), float(active_bounds[1][3])
         rv_grid = np.linspace(rv_lo, rv_hi, int(rv_grid_n))
         report(
             "Running coarse RV grid scan with {0} trial velocities.".format(
@@ -3720,80 +4039,278 @@ def fit_phoenix_full_spectrum(
                 "Adding top coarse physical candidates to the local multistart queue.",
                 phase="multistart",
             )
-    starts = _build_local_multistarts(
-        p0,
-        bounds,
-        effective_multistart,
-        alternate_rv=alternate_rv,
-        candidate_points=coarse_candidate_points,
-    )
-    local_results = []
-    for start_index, start in enumerate(starts):
-        report(
-            "Starting local optimizer {0}/{1}: p0=({2:g}, {3:g}, {4:g}, {5:g}).".format(
-                start_index + 1,
-                len(starts),
-                float(start[0]),
-                float(start[1]),
-                float(start[2]),
-                float(start[3]),
-            ),
-            phase="local_optimize",
-            current=start_index + 1,
-            total=len(starts),
-            fraction=float(start_index / max(1, len(starts))),
-            payload={"start": np.asarray(start, dtype=float).tolist()},
+    def _run_local_optimizers(start_point, optimizer_bounds, iteration_index):
+        iteration_starts = _build_local_multistarts(
+            start_point,
+            optimizer_bounds,
+            effective_multistart,
+            alternate_rv=alternate_rv,
+            candidate_points=coarse_candidate_points,
         )
-        candidate_result = least_squares(
-            residuals,
-            x0=np.asarray(start, dtype=float),
-            bounds=bounds,
-            method="trf",
-            x_scale=x_scale,
-            max_nfev=int(max_nfev),
-            loss=loss,
-            f_scale=loss_f_scale,
-            verbose=2 if verbose else 0,
-        )
-        local_results.append(candidate_result)
-        candidate_chi2 = float(np.sum(candidate_result.fun * candidate_result.fun))
-        report(
-            "Finished local optimizer {0}/{1}: chi2={2:.6g}, success={3}.".format(
-                start_index + 1,
-                len(starts),
-                candidate_chi2,
-                bool(candidate_result.success),
-            ),
-            phase="local_optimize",
-            current=start_index + 1,
-            total=len(starts),
-            fraction=float((start_index + 1) / max(1, len(starts))),
-            payload={
-                "chi2": float(candidate_chi2),
-                "success": bool(candidate_result.success),
-            },
-        )
-        if verbose and len(starts) > 1:
-            print(
-                "Local start {0}/{1}: chi2={2:.6g}".format(
+        iteration_results = []
+        for start_index, start in enumerate(iteration_starts):
+            report(
+                "Starting local optimizer {0}/{1} (grid iteration {2}): "
+                "p0=({3:g}, {4:g}, {5:g}, {6:g}).".format(
                     start_index + 1,
-                    len(starts),
-                    candidate_chi2,
-                )
+                    len(iteration_starts),
+                    iteration_index + 1,
+                    float(start[0]),
+                    float(start[1]),
+                    float(start[2]),
+                    float(start[3]),
+                ),
+                phase="local_optimize",
+                current=start_index + 1,
+                total=len(iteration_starts),
+                fraction=float(start_index / max(1, len(iteration_starts))),
+                payload={
+                    "start": np.asarray(start, dtype=float).tolist(),
+                    "grid_iteration": int(iteration_index),
+                },
             )
-    res = min(local_results, key=lambda item: float(np.sum(item.fun * item.fun)))
-    multistart_diagnostics = []
-    for start, item in zip(starts, local_results):
-        multistart_diagnostics.append(
-            {
-                "start": np.asarray(start, dtype=float).tolist(),
-                "solution": np.asarray(item.x, dtype=float).tolist(),
-                "chi2": float(np.sum(item.fun * item.fun)),
-                "success": bool(item.success),
-                "status": int(item.status),
-                "nfev": int(item.nfev),
-            }
+            candidate_result = least_squares(
+                residuals,
+                x0=np.asarray(start, dtype=float),
+                bounds=optimizer_bounds,
+                method="trf",
+                x_scale=x_scale,
+                max_nfev=int(max_nfev),
+                loss=loss,
+                f_scale=loss_f_scale,
+                verbose=2 if verbose else 0,
+            )
+            iteration_results.append(candidate_result)
+            candidate_chi2 = float(
+                np.sum(candidate_result.fun * candidate_result.fun)
+            )
+            report(
+                "Finished local optimizer {0}/{1} (grid iteration {2}): "
+                "chi2={3:.6g}, success={4}.".format(
+                    start_index + 1,
+                    len(iteration_starts),
+                    iteration_index + 1,
+                    candidate_chi2,
+                    bool(candidate_result.success),
+                ),
+                phase="local_optimize",
+                current=start_index + 1,
+                total=len(iteration_starts),
+                fraction=float(
+                    (start_index + 1) / max(1, len(iteration_starts))
+                ),
+                payload={
+                    "chi2": candidate_chi2,
+                    "success": bool(candidate_result.success),
+                    "grid_iteration": int(iteration_index),
+                },
+            )
+            if verbose and len(iteration_starts) > 1:
+                print(
+                    "Local start {0}/{1}: chi2={2:.6g}".format(
+                        start_index + 1,
+                        len(iteration_starts),
+                        candidate_chi2,
+                    )
+                )
+
+        iteration_best = min(
+            iteration_results,
+            key=lambda item: float(np.sum(item.fun * item.fun)),
         )
+        iteration_diagnostics = []
+        for start, item in zip(iteration_starts, iteration_results):
+            iteration_diagnostics.append(
+                {
+                    "start": np.asarray(start, dtype=float).tolist(),
+                    "solution": np.asarray(item.x, dtype=float).tolist(),
+                    "chi2": float(np.sum(item.fun * item.fun)),
+                    "success": bool(item.success),
+                    "status": int(item.status),
+                    "nfev": int(item.nfev),
+                }
+            )
+        return iteration_best, iteration_starts, iteration_diagnostics
+
+    search_history = []
+    expansion_count = 0
+    previous_iteration_chi2 = None
+    current_start = np.asarray(p0, dtype=float)
+    selected_iteration = None
+    stop_reason = None
+    installed_axes_metadata = None
+    installed_axes_source = "not_scanned_no_expansion_needed"
+    unavailable_installed_edges = set()
+
+    while True:
+        active_bounds, bound_restrictions = _intersect_optimizer_bounds(
+            requested_bounds,
+            effective_grid_axes,
+        )
+        iteration_index = len(search_history)
+        iteration_result, iteration_starts, iteration_multistart = (
+            _run_local_optimizers(
+                current_start,
+                active_bounds,
+                iteration_index,
+            )
+        )
+        iteration_chi2 = float(
+            np.sum(iteration_result.fun * iteration_result.fun)
+        )
+        boundary = _local_grid_boundary_diagnostics(
+            iteration_result.x,
+            effective_grid_axes,
+            requested_bounds,
+            edge_fraction=local_grid_edge_fraction,
+        )
+        relative_improvement = None
+        if previous_iteration_chi2 is not None:
+            relative_improvement = float(
+                (previous_iteration_chi2 - iteration_chi2)
+                / max(abs(previous_iteration_chi2), np.finfo(float).eps)
+            )
+        history_item = {
+            "iteration": int(iteration_index),
+            "effective_axes": _grid_axes_summary(effective_grid_axes),
+            "active_optimizer_bounds": _bounds_to_metadata(active_bounds),
+            "bound_restrictions": bound_restrictions,
+            "solution": np.asarray(iteration_result.x, dtype=float).tolist(),
+            "chi2": iteration_chi2,
+            "relative_improvement": relative_improvement,
+            "boundary": boundary,
+            "multistart_diagnostics": iteration_multistart,
+        }
+        search_history.append(history_item)
+        candidate_iteration = {
+            "result": iteration_result,
+            "starts": iteration_starts,
+            "multistart_diagnostics": iteration_multistart,
+            "chi2": iteration_chi2,
+            "iteration": int(iteration_index),
+        }
+        if (
+            selected_iteration is None
+            or iteration_chi2 < selected_iteration["chi2"]
+        ):
+            selected_iteration = candidate_iteration
+
+        if not local_grid_was_internal:
+            stop_reason = "explicit_grid_fixed"
+            break
+        if local_grid_policy == "fixed":
+            stop_reason = "policy_fixed"
+            break
+        if not boundary["any_expandable_edge"]:
+            stop_reason = (
+                "near_requested_boundary"
+                if boundary["any_near_edge"]
+                else "interior_solution"
+            )
+            break
+        if expansion_count >= local_grid_max_expansions:
+            stop_reason = "maximum_expansions"
+            break
+        if (
+            relative_improvement is not None
+            and relative_improvement < local_grid_min_relative_improvement
+        ):
+            stop_reason = "insufficient_objective_improvement"
+            break
+
+        next_axes, expanded, expansion_metadata = _expand_local_grid_axes(
+            phoenix_lib,
+            effective_grid_axes,
+            boundary,
+            max_templates=local_grid_max_templates,
+        )
+        history_item["expansion"] = expansion_metadata
+        installed_axes_metadata = expansion_metadata.get("installed_axes")
+        installed_axes_source = str(
+            expansion_metadata.get("installed_axes_source", "unknown")
+        )
+        for edge in expansion_metadata.get("unavailable_edges", []):
+            unavailable_installed_edges.add(
+                (str(edge.get("parameter")), str(edge.get("side")))
+            )
+        if not expanded:
+            stop_reason = str(expansion_metadata.get("reason", "not_expanded"))
+            break
+
+        expansion_count += 1
+        effective_grid_axes = tuple(axis.copy() for axis in next_axes)
+        _prepare_phoenix_interpolator(
+            effective_grid_axes,
+            expansion_index=expansion_count,
+        )
+        previous_iteration_chi2 = iteration_chi2
+        current_start = np.asarray(iteration_result.x, dtype=float)
+
+    res = selected_iteration["result"]
+    starts = selected_iteration["starts"]
+    multistart_diagnostics = selected_iteration["multistart_diagnostics"]
+    active_bounds, final_bound_restrictions = _intersect_optimizer_bounds(
+        requested_bounds,
+        effective_grid_axes,
+    )
+    final_boundary = _local_grid_boundary_diagnostics(
+        res.x,
+        effective_grid_axes,
+        requested_bounds,
+        edge_fraction=local_grid_edge_fraction,
+    )
+    any_final_restriction = any(
+        bool(sides["low"] or sides["high"])
+        for sides in final_bound_restrictions.values()
+    )
+    explicit_grid_restriction = bool(
+        not local_grid_was_internal and any_final_restriction
+    )
+    boundary_unresolved = bool(final_boundary["any_expandable_edge"])
+    unresolved_internal_edge = bool(
+        local_grid_was_internal and boundary_unresolved
+    )
+    installed_grid_boundary = any(
+        bool(
+            final_boundary["parameters"][parameter].get(
+                "expand_{0}".format(side),
+                False,
+            )
+        )
+        for parameter, side in unavailable_installed_edges
+    )
+    search_coverage = {
+        "policy_requested": local_grid_policy,
+        "policy_effective": (
+            local_grid_policy if local_grid_was_internal else "fixed_explicit_grid"
+        ),
+        "grid_was_internally_selected": bool(local_grid_was_internal),
+        "requested_bounds": _bounds_to_metadata(requested_bounds),
+        "initial_effective_axes": _grid_axes_summary(initial_grid_axes),
+        "effective_axes": _grid_axes_summary(effective_grid_axes),
+        "installed_axes": installed_axes_metadata,
+        "installed_axes_source": installed_axes_source,
+        "active_optimizer_bounds": _bounds_to_metadata(active_bounds),
+        "initial_bound_restrictions": initial_bound_restrictions,
+        "final_bound_restrictions": final_bound_restrictions,
+        "edge_fraction": float(local_grid_edge_fraction),
+        "max_expansions": int(local_grid_max_expansions),
+        "expansion_count": int(expansion_count),
+        "expanded": bool(expansion_count > 0),
+        "max_templates": int(local_grid_max_templates),
+        "min_relative_improvement": float(
+            local_grid_min_relative_improvement
+        ),
+        "selected_iteration": int(selected_iteration["iteration"]),
+        "stop_reason": str(stop_reason),
+        "final_boundary": final_boundary,
+        "near_grid_edge": bool(final_boundary["any_near_edge"]),
+        "boundary_unresolved": boundary_unresolved,
+        "installed_grid_boundary": bool(installed_grid_boundary),
+        "explicit_grid_restricts_requested_bounds": explicit_grid_restriction,
+        "incomplete": bool(explicit_grid_restriction or unresolved_internal_edge),
+        "history": search_history,
+    }
 
     # Compute diagnostics. If segment weights are used, chi2 is the weighted
     # sum of squared normalized residuals.
@@ -3886,6 +4403,7 @@ def fit_phoenix_full_spectrum(
         error_floor_applied=error_floor_applied,
         parameter_errors_available=parameter_errors is not None,
         continuum_diagnostics=continuum_diagnostics,
+        search_coverage=search_coverage,
     )
     quality_flags = _phoenix_quality_flags(diagnostics, success=res.success)
     velocity_convention = diagnostics["velocity_convention"]
@@ -3935,6 +4453,7 @@ def fit_phoenix_full_spectrum(
         "invalid_model_evaluations": int(invalid_model_evaluations["count"]),
         "physical_initialization": physical_init,
         "coarse_initialization": coarse_initialization,
+        "search_coverage": search_coverage,
         "multistart": int(len(starts)),
         "multistart_requested": int(multistart),
         "stellar_rest_zero_rv_start_tested": bool(

@@ -664,6 +664,19 @@ when you want the input-file SHA256 recorded for reproducibility.
 Existing low-level fitting functions keep returning dictionaries for backward
 compatibility.
 
+When the low-level fitter selects its own compact PHOENIX interpolation grid,
+it now keeps the requested physical bounds separate from the active optimizer
+bounds. The optimizer is restricted to the effective interpolation cube, so a
+broad requested range cannot generate silent out-of-grid evaluations. With the
+default `local_grid_policy="auto"`, a solution near an expandable grid edge
+causes a bounded restart after adding one installed node layer; at most two
+expansions and 300 rectangular grid templates are allowed by default. Explicit
+`teff_grid`, `feh_grid`, or `logg_grid` arguments always remain fixed. Inspect
+`result["search_coverage"]` for requested and active bounds, initial/final axes,
+expansion history, and the stopping reason. An unresolved or explicitly
+restricted search is also surfaced in `quality_flags`; it should not be counted
+as an unbiased parameter-recovery pass.
+
 For a `SpectrumCollection`, the four physical parameters (`teff`, `feh`,
 `logg`, and `rv_kms`) are shared, while the multiplicative Legendre continuum
 is profiled independently in every retained segment. Thus `mdeg=0` already
