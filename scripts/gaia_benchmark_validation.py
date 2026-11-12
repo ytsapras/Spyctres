@@ -122,6 +122,15 @@ AGGREGATE_RECOVERY_TARGETS = {
     },
 }
 
+# Diagnostic tail thresholds are reported independently of the aggregate
+# median/scatter goals. They are not fit acceptance criteria.
+TAIL_ABSOLUTE_ERROR_THRESHOLDS = {
+    "teff": 500.0,
+    "logg": 0.5,
+    "feh": 0.5,
+    "rv_kms": 10.0,
+}
+
 BENCHMARK_WINDOW_SETS = {
     "default": {
         "label": "default diagnostic branch windows",
@@ -396,6 +405,12 @@ def _atomic_write_csv(path, payload):
         "delta_rv_kms",
         "rv_assessment",
         "overall_assessment",
+        "parameter_tolerance_assessment",
+        "optimizer_success_assessment",
+        "local_search_coverage_assessment",
+        "identifiability_assessment",
+        "recovery_readiness_assessment",
+        "scientific_review_status",
         "chi2_red",
         "quality_flags",
         "fit_quality_assessment",
@@ -662,6 +677,70 @@ def _fit_quality_assessment(record):
     return "systematics_dominated_formal_chi2"
 
 
+def _local_search_coverage_assessment(record):
+    """Classify local-grid coverage without conflating it with recovery."""
+    if record.get("status") != "ok":
+        return record.get("status", "not_fit")
+    fit_result = record.get("fit_result") or {}
+    coverage = fit_result.get("search_coverage") or {}
+    if not coverage:
+        return "not_reported"
+    if bool(coverage.get("incomplete")) or bool(
+        coverage.get("boundary_unresolved")
+    ):
+        return "incomplete"
+    return "resolved"
+
+
+def _optimizer_success_assessment(record):
+    if record.get("status") != "ok":
+        return record.get("status", "not_fit")
+    fit = record.get("fit") or {}
+    return "succeeded" if bool(fit.get("success")) else "failed"
+
+
+def _identifiability_assessment(record):
+    """Report the limited evidence available; do not claim identifiability."""
+    if record.get("status") != "ok":
+        return record.get("status", "not_fit")
+    uncertainty = (record.get("fit_result") or {}).get("parameter_uncertainty") or {}
+    if bool(uncertainty.get("available")):
+        return "not_established_local_covariance_only"
+    return "not_assessed"
+
+
+def _recovery_readiness_assessment(record):
+    tolerance = _overall_assessment(record)
+    if record.get("status") != "ok":
+        return tolerance
+    coverage = _local_search_coverage_assessment(record)
+    if tolerance == "within_first_pass_tolerance" and coverage == "resolved":
+        return "within_tolerance_local_search_resolved"
+    if tolerance == "within_first_pass_tolerance" and coverage == "incomplete":
+        return "provisional_within_tolerance_incomplete_search"
+    if tolerance == "within_first_pass_tolerance":
+        return "provisional_within_tolerance_coverage_not_reported"
+    return "{0}_{1}_search".format(tolerance, coverage)
+
+
+def _recovery_record(record):
+    deltas, assessments = _fit_deltas(record)
+    return {
+        "deltas": deltas,
+        "assessments": assessments,
+        # Backward-compatible field: this is a parameter-tolerance assessment,
+        # not a claim of optimizer reliability or scientific validation.
+        "overall_assessment": _overall_assessment(record),
+        "parameter_tolerance_assessment": _overall_assessment(record),
+        "optimizer_success_assessment": _optimizer_success_assessment(record),
+        "local_search_coverage_assessment": _local_search_coverage_assessment(record),
+        "identifiability_assessment": _identifiability_assessment(record),
+        "fit_quality_assessment": _fit_quality_assessment(record),
+        "recovery_readiness_assessment": _recovery_readiness_assessment(record),
+        "scientific_review_status": "not_reviewed_by_runner",
+    }
+
+
 def _robust_scatter(values):
     arr = np.asarray(values, dtype=float)
     arr = arr[np.isfinite(arr)]
@@ -676,36 +755,95 @@ def _aggregate_recovery_statistics(records):
     stats = {}
     for param in ("teff", "logg", "feh", "rv_kms"):
         deltas = []
+        labelled_deltas = []
         for record in records:
             record_deltas, _assessments = _fit_deltas(record)
             delta = _float_or_none(record_deltas.get(param))
             if delta is not None:
                 deltas.append(delta)
+                labelled_deltas.append(
+                    {
+                        "target_id": record.get("target_id"),
+                        "name": record.get("name"),
+                        "delta": float(delta),
+                        "absolute_error": float(abs(delta)),
+                    }
+                )
         targets = dict(AGGREGATE_RECOVERY_TARGETS[param])
+        targets["median_abs_bias_target_metric"] = "abs_median_signed_error"
+        tail_threshold = float(TAIL_ABSOLUTE_ERROR_THRESHOLDS[param])
         if not deltas:
             stats[param] = {
                 "n": 0,
+                "n_records_considered": int(len(records)),
+                "n_missing_reference": int(len(records)),
                 "median_bias": None,
                 "median_abs_bias": None,
+                "median_abs_bias_definition": (
+                    "Deprecated compatibility alias for "
+                    "abs_median_signed_error; it is not the median absolute error."
+                ),
+                "median_signed_error": None,
+                "abs_median_signed_error": None,
+                "median_absolute_error": None,
+                "mean_absolute_error": None,
+                "rmse": None,
                 "robust_scatter": None,
+                "percentile_90_absolute_error": None,
+                "max_absolute_error": None,
+                "tail_absolute_error_threshold": tail_threshold,
+                "tail_outlier_count": 0,
+                "tail_outlier_fraction": None,
+                "tail_outliers": [],
                 "targets": targets,
                 "target_status": "not_evaluated_no_reference_deltas",
             }
             continue
         arr = np.asarray(deltas, dtype=float)
-        median_bias = float(np.nanmedian(arr))
-        median_abs_bias = float(abs(median_bias))
+        absolute = np.abs(arr)
+        median_signed_error = float(np.nanmedian(arr))
+        abs_median_signed_error = float(abs(median_signed_error))
+        median_absolute_error = float(np.nanmedian(absolute))
+        mean_absolute_error = float(np.nanmean(absolute))
+        rmse = float(np.sqrt(np.nanmean(arr * arr)))
         robust_scatter = _robust_scatter(arr)
-        bias_ok = median_abs_bias <= float(targets["median_abs_bias_target"])
+        tail_outliers = [
+            item
+            for item in labelled_deltas
+            if item["absolute_error"] > tail_threshold
+        ]
+        bias_ok = abs_median_signed_error <= float(
+            targets["median_abs_bias_target"]
+        )
         scatter_target = targets.get("robust_scatter_target")
         scatter_ok = True if scatter_target is None else (
             robust_scatter is not None and robust_scatter <= float(scatter_target)
         )
         stats[param] = {
             "n": int(arr.size),
-            "median_bias": median_bias,
-            "median_abs_bias": median_abs_bias,
+            "n_records_considered": int(len(records)),
+            "n_missing_reference": int(len(records) - arr.size),
+            # Compatibility aliases retain their historical semantics.
+            "median_bias": median_signed_error,
+            "median_abs_bias": abs_median_signed_error,
+            "median_abs_bias_definition": (
+                "Deprecated compatibility alias for abs_median_signed_error; "
+                "it is not the median absolute error."
+            ),
+            "median_signed_error": median_signed_error,
+            "abs_median_signed_error": abs_median_signed_error,
+            "median_absolute_error": median_absolute_error,
+            "mean_absolute_error": mean_absolute_error,
+            "rmse": rmse,
             "robust_scatter": robust_scatter,
+            "percentile_90_absolute_error": float(
+                np.nanpercentile(absolute, 90.0)
+            ),
+            "max_absolute_error": float(np.nanmax(absolute)),
+            "tail_absolute_error_threshold": tail_threshold,
+            "tail_outlier_count": int(len(tail_outliers)),
+            "tail_outlier_fraction": float(len(tail_outliers) / arr.size),
+            "tail_outliers": tail_outliers,
             "targets": targets,
             "target_status": (
                 "meets_reporting_target" if bias_ok and scatter_ok else "outside_reporting_target"
@@ -751,6 +889,12 @@ def _csv_row(record):
         "delta_rv_kms": deltas.get("rv_kms"),
         "rv_assessment": assessments.get("rv_kms"),
         "overall_assessment": _overall_assessment(record),
+        "parameter_tolerance_assessment": _overall_assessment(record),
+        "optimizer_success_assessment": _optimizer_success_assessment(record),
+        "local_search_coverage_assessment": _local_search_coverage_assessment(record),
+        "identifiability_assessment": _identifiability_assessment(record),
+        "recovery_readiness_assessment": _recovery_readiness_assessment(record),
+        "scientific_review_status": "not_reviewed_by_runner",
         "chi2_red": fit.get("chi2_red"),
         "quality_flags": ";".join(str(item) for item in record.get("quality_flags", [])),
         "fit_quality_assessment": _fit_quality_assessment(record),
@@ -774,6 +918,17 @@ def summarize_payload(records):
     ]
     ordinary_assessments = Counter(_overall_assessment(record) for record in ordinary)
     ordinary_fit_quality = Counter(_fit_quality_assessment(record) for record in ordinary)
+    ordinary_coverage = Counter(
+        _local_search_coverage_assessment(record) for record in ordinary
+    )
+    ordinary_readiness = Counter(
+        _recovery_readiness_assessment(record) for record in ordinary
+    )
+    tolerance_by_coverage = {}
+    for record in ordinary:
+        tolerance = _overall_assessment(record)
+        coverage = _local_search_coverage_assessment(record)
+        tolerance_by_coverage.setdefault(tolerance, Counter())[coverage] += 1
     return {
         "n_records": int(len(records)),
         "by_status": dict(sorted(statuses.items())),
@@ -782,15 +937,38 @@ def summarize_payload(records):
         "ordinary_recovery_n": int(len(ordinary)),
         "ordinary_recovery_assessments": dict(sorted(ordinary_assessments.items())),
         "ordinary_fit_quality_assessments": dict(sorted(ordinary_fit_quality.items())),
+        "ordinary_local_search_coverage_assessments": dict(
+            sorted(ordinary_coverage.items())
+        ),
+        "ordinary_recovery_readiness_assessments": dict(
+            sorted(ordinary_readiness.items())
+        ),
+        "ordinary_tolerance_by_local_search_coverage": {
+            key: dict(sorted(value.items()))
+            for key, value in sorted(tolerance_by_coverage.items())
+        },
         "thresholds": RECOVERY_THRESHOLDS,
         "per_star_engineering_gates": RECOVERY_THRESHOLDS,
         "ordinary_aggregate_recovery_targets": AGGREGATE_RECOVERY_TARGETS,
+        "tail_absolute_error_thresholds": TAIL_ABSOLUTE_ERROR_THRESHOLDS,
         "ordinary_aggregate_recovery": _aggregate_recovery_statistics(ordinary),
+        "aggregate_metric_definitions": {
+            "median_signed_error": "median(fit - reference)",
+            "abs_median_signed_error": "absolute value of median(fit - reference)",
+            "median_absolute_error": "median(abs(fit - reference))",
+            "mean_absolute_error": "mean(abs(fit - reference))",
+            "rmse": "sqrt(mean((fit - reference)^2))",
+            "robust_scatter": "1.4826 * median(abs(delta - median(delta)))",
+            "median_bias": "compatibility alias for median_signed_error",
+            "median_abs_bias": "deprecated compatibility alias for abs_median_signed_error",
+        },
         "notes": [
             "Reference parameters are used only for post-fit deltas.",
             "Stress/diagnostic targets are reported separately from ordinary recovery statistics.",
             "Aggregate recovery targets are reporting goals for ordinary FGK samples, not per-star tuning criteria.",
             "Formal fit quality is reported separately from parameter recovery because high-S/N benchmark spectra can be dominated by model/systematic residuals.",
+            "A tolerance pass with incomplete or unreported local-search coverage is provisional.",
+            "The runner does not establish parameter identifiability or scientific review status.",
             "Local covariance errors, when present in fit outputs, do not include external systematic uncertainty.",
         ],
     }
@@ -1224,7 +1402,11 @@ def _is_complete(record, run_fits):
 
 
 def build_payload(manifest_path, manifest_payload, records, args):
-    ordered = list(records)
+    ordered = []
+    for item in records:
+        record = dict(item)
+        record["recovery"] = _recovery_record(record)
+        ordered.append(record)
     payload = {
         "schema_version": 1,
         "runner": "scripts/gaia_benchmark_validation.py",
@@ -1308,12 +1490,7 @@ def main(argv=None):
                 record["status"] = "ok" if record.get("fit", {}).get("success") else "fit_failed"
             else:
                 record["status"] = "audit_only"
-            record["recovery"] = {
-                "deltas": _fit_deltas(record)[0],
-                "assessments": _fit_deltas(record)[1],
-                "overall_assessment": _overall_assessment(record),
-                "fit_quality_assessment": _fit_quality_assessment(record),
-            }
+            record["recovery"] = _recovery_record(record)
         except Exception as exc:
             record = {
                 "target_id": target_id,

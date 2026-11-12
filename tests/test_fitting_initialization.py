@@ -1,4 +1,5 @@
 import inspect
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -16,6 +17,7 @@ from Spyctres.fitting import (
     _local_grid_boundary_diagnostics,
     _make_forward_segments,
     _legendre_continuum_diagnostics,
+    _optimizer_objective_value,
     _phoenix_quality_flags,
     _retained_segments_from_meta,
     _resolve_segment_fwhm_kms,
@@ -296,6 +298,8 @@ def _run_expandable_local_grid_fit(
     truth_logg,
     library=None,
     explicit=False,
+    bounds=None,
+    **fit_options,
 ):
     wave = np.linspace(5000.0, 5100.0, 501)
     truth = (5100.0, 0.0, float(truth_logg))
@@ -318,12 +322,17 @@ def _run_expandable_local_grid_fit(
         segment,
         phoenix_lib=library,
         p0=(5100.0, 0.0, 3.0, 0.0),
-        bounds=((4900.0, -0.5, 1.5, -1.0), (5300.0, 0.5, 4.0, 1.0)),
+        bounds=(
+            ((4900.0, -0.5, 1.5, -1.0), (5300.0, 0.5, 4.0, 1.0))
+            if bounds is None
+            else bounds
+        ),
         mdeg=0,
         rv_init=None,
         multistart=1,
         max_nfev=100,
         forward_model="interp_observed",
+        **fit_options,
         **kwargs,
     )
     return result, library
@@ -367,6 +376,74 @@ def test_internal_local_grid_does_not_expand_for_interior_solution():
     assert coverage["expansion_count"] == 0
     assert coverage["stop_reason"] == "interior_solution"
 
+    # An external label can disagree strongly while the objective has an
+    # interior minimum. Grid expansion is a coverage guard, not a scientific
+    # correctness test.
+    external_reference_logg = 1.8
+    assert abs(result["logg"] - external_reference_logg) > 1.0
+
+
+def test_internal_local_grid_stops_at_maximum_expansions_and_flags_coverage():
+    result, library = _run_expandable_local_grid_fit(
+        1.8,
+        local_grid_max_expansions=1,
+    )
+
+    coverage = result["search_coverage"]
+    assert library.build_count == 2
+    assert coverage["expansion_count"] == 1
+    assert coverage["stop_reason"] == "maximum_expansions"
+    assert coverage["boundary_unresolved"] is True
+    assert coverage["incomplete"] is True
+    assert "incomplete_search_coverage" in result["quality_flags"]
+
+
+def test_internal_local_grid_template_budget_stops_before_rebuild():
+    result, library = _run_expandable_local_grid_fit(
+        1.8,
+        local_grid_max_templates=45,
+    )
+
+    coverage = result["search_coverage"]
+    assert library.build_count == 1
+    assert coverage["expansion_count"] == 0
+    assert coverage["stop_reason"] == "template_budget"
+    assert coverage["incomplete"] is True
+
+
+def test_requested_physical_boundary_is_resolved_without_expansion():
+    result, library = _run_expandable_local_grid_fit(
+        2.5,
+        bounds=((4900.0, -0.5, 2.5, -1.0), (5300.0, 0.5, 4.0, 1.0)),
+    )
+
+    coverage = result["search_coverage"]
+    assert result["logg"] == pytest.approx(2.5, abs=1e-4)
+    assert library.build_count == 1
+    assert coverage["stop_reason"] == "near_requested_boundary"
+    assert coverage["boundary_unresolved"] is False
+    assert coverage["incomplete"] is False
+
+
+def test_incomplete_subgrid_stops_and_flags_unresolved_coverage():
+    class IncompleteExpansionLibrary(_ExpandableLocalGridLibrary):
+        def complete_subgrid(self, teff_grid, feh_grid, logg_grid):
+            completed = super().complete_subgrid(teff_grid, feh_grid, logg_grid)
+            logg = completed[2]
+            if np.any(np.isclose(logg, 2.0)):
+                logg = logg[~np.isclose(logg, 2.0)]
+            return completed[0], completed[1], logg
+
+    result, library = _run_expandable_local_grid_fit(
+        1.8,
+        library=IncompleteExpansionLibrary(),
+    )
+
+    coverage = result["search_coverage"]
+    assert library.build_count == 1
+    assert coverage["stop_reason"] == "incomplete_subgrid"
+    assert coverage["incomplete"] is True
+
 
 def test_installed_grid_boundary_stops_and_flags_incomplete_coverage():
     library = _ExpandableLocalGridLibrary(installed_logg=[2.5, 3.0, 3.5])
@@ -395,6 +472,29 @@ def test_local_multistarts_are_deterministic_and_inside_bounds():
     for start in starts:
         assert np.all(start > np.asarray(bounds[0]))
         assert np.all(start < np.asarray(bounds[1]))
+
+
+def test_optimizer_candidate_ranking_uses_robust_objective_not_raw_l2():
+    raw_l2_favorite = SimpleNamespace(
+        fun=np.array([1.0]),
+        cost=10.0,
+    )
+    robust_objective_favorite = SimpleNamespace(
+        fun=np.array([2.0]),
+        cost=2.0,
+    )
+
+    assert np.sum(raw_l2_favorite.fun**2) < np.sum(
+        robust_objective_favorite.fun**2
+    )
+    assert _optimizer_objective_value(robust_objective_favorite) < (
+        _optimizer_objective_value(raw_l2_favorite)
+    )
+    selected = min(
+        [raw_l2_favorite, robust_objective_favorite],
+        key=_optimizer_objective_value,
+    )
+    assert selected is robust_objective_favorite
 
 
 def test_local_multistarts_can_force_zero_rv_independently():
@@ -747,6 +847,14 @@ def test_multisegment_weighted_chi2_and_dof_accounting():
     assert result["optimizer_loss_f_scale"] == 2.0
     assert result["optimizer_cost"] is not None
     assert result["optimizer_cost_twice"] == pytest.approx(2.0 * result["optimizer_cost"])
+    objective = result["diagnostics"]["optimizer_objective"]
+    assert objective["selection_metric"] == "scipy_least_squares_cost"
+    assert objective["value"] == pytest.approx(result["optimizer_cost_twice"])
+    assert objective["mode"] == "hybrid_l2_profiled_robust_outer"
+    assert (
+        result["diagnostics"]["continuum_model"]["optimizer_consistency"]
+        == "hybrid_l2_profiled_continuum_with_robust_outer_loss"
+    )
     assert result["effective_chi2"] == pytest.approx(result["chi2"])
     assert result["effective_chi2_red"] == pytest.approx(result["chi2_red"])
     assert result["raw_chi2"] == pytest.approx(result["chi2"])

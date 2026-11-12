@@ -590,7 +590,12 @@ ordinary validation defaults. For reviewer-friendly local line views, add
 `plot_model_line_windows()` helper with a Gaia-benchmark preset list of
 diagnostic windows. Add `--line-plot-reference-model` only when you want a
 diagnostic PHOENIX overlay at the manifest Teff/logg/[Fe/H]; those reference
-values are still not used as fit priors.
+values are still not used as fit priors. Recovery summaries report signed
+bias, median/mean absolute error, RMSE, robust scatter, and tail outliers
+separately. Optimizer success, parameter tolerance, local-search coverage,
+formal residual quality, identifiability evidence, and scientific-review
+status are also separate; a tolerance pass with incomplete search coverage is
+reported as provisional.
 Wavelengths are represented in Angstrom, uncertainties as 1-sigma standard
 deviations, and masks use `True` to mean a valid/usable pixel. Observer-motion
 frame and stellar-rest correction status are tracked independently. Instrumental

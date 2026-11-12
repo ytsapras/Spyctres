@@ -84,7 +84,10 @@ scientific than smoke tests.
   and summary plots by default; expensive PHOENIX recovery fits are opt-in with
   `--run-fits`. Literature parameters are recorded only for post-fit deltas,
   while stress targets remain bounded and separate from ordinary recovery
-  statistics.
+  statistics. The recovery summary distinguishes signed bias from absolute
+  errors and tail failures, and it does not treat optimizer completion,
+  parameter tolerance, grid coverage, residual quality, identifiability, or
+  scientific review as interchangeable states.
 - `diagnostic_window_audit.py` runs the PHOENIX-free diagnostic-window selector
   over a manifest, such as the bundled XSL Figure 1 validation manifest, and
   writes role-aware JSON/CSV summaries plus an optional top-window heatmap. Use

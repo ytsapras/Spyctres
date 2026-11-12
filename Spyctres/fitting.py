@@ -1745,6 +1745,8 @@ def _build_phoenix_fit_diagnostics(
                 "start": solution.get("start"),
                 "solution": solution.get("solution"),
                 "chi2": solution.get("chi2"),
+                "objective_value": solution.get("objective_value"),
+                "optimizer_cost": solution.get("optimizer_cost"),
                 "success": bool(solution.get("success", False)),
                 "status": solution.get("status"),
                 "nfev": solution.get("nfev"),
@@ -1846,6 +1848,19 @@ def _build_phoenix_fit_diagnostics(
         "optimizer_cost_twice": (
             None if optimizer_cost_twice is None else float(optimizer_cost_twice)
         ),
+        "optimizer_objective": {
+            "selection_metric": "scipy_least_squares_cost",
+            "value": (
+                None if optimizer_cost_twice is None else float(optimizer_cost_twice)
+            ),
+            "loss": str(optimizer_loss),
+            "continuum_profile_objective": "weighted_linear_least_squares",
+            "mode": (
+                "linear_least_squares"
+                if str(optimizer_loss) == "linear"
+                else "hybrid_l2_profiled_robust_outer"
+            ),
+        },
         "chi2_interpretation": chi2_interpretation,
         "segment_diagnostics": segment_diagnostics,
         "grid_summary": grid_summary,
@@ -1872,6 +1887,12 @@ def _build_phoenix_fit_diagnostics(
             "segment_parameters_are_independent": True,
             "physical_parameters_are_shared": ["teff", "feh", "logg", "rv_kms"],
             "segments": [dict(item) for item in continuum_diagnostics],
+            "profile_objective": "weighted_linear_least_squares",
+            "optimizer_consistency": (
+                "same_linear_objective"
+                if str(optimizer_loss) == "linear"
+                else "hybrid_l2_profiled_continuum_with_robust_outer_loss"
+            ),
             "interpretation": (
                 "Per-segment nuisance corrections profiled in flux space; "
                 "they do not establish physical cross-arm flux calibration."
@@ -2319,6 +2340,17 @@ def _start_is_duplicate(candidate, starts):
         np.allclose(candidate, existing, rtol=0.0, atol=1e-10)
         for existing in starts
     )
+
+
+def _optimizer_objective_value(result):
+    """Return the objective minimized by SciPy ``least_squares``.
+
+    SciPy stores half of its robust least-squares objective in ``cost``.
+    Multiplying by two retains the familiar chi-square scale for the linear
+    loss while, unlike ``sum(result.fun**2)``, preserving the correct ranking
+    when a nonlinear robust loss is active.
+    """
+    return float(2.0 * result.cost)
 
 
 def _build_local_multistarts(
@@ -4084,12 +4116,14 @@ def fit_phoenix_full_spectrum(
             candidate_chi2 = float(
                 np.sum(candidate_result.fun * candidate_result.fun)
             )
+            candidate_objective = _optimizer_objective_value(candidate_result)
             report(
                 "Finished local optimizer {0}/{1} (grid iteration {2}): "
-                "chi2={3:.6g}, success={4}.".format(
+                "objective={3:.6g}, chi2={4:.6g}, success={5}.".format(
                     start_index + 1,
                     len(iteration_starts),
                     iteration_index + 1,
+                    candidate_objective,
                     candidate_chi2,
                     bool(candidate_result.success),
                 ),
@@ -4100,6 +4134,7 @@ def fit_phoenix_full_spectrum(
                     (start_index + 1) / max(1, len(iteration_starts))
                 ),
                 payload={
+                    "objective_value": candidate_objective,
                     "chi2": candidate_chi2,
                     "success": bool(candidate_result.success),
                     "grid_iteration": int(iteration_index),
@@ -4107,16 +4142,17 @@ def fit_phoenix_full_spectrum(
             )
             if verbose and len(iteration_starts) > 1:
                 print(
-                    "Local start {0}/{1}: chi2={2:.6g}".format(
+                    "Local start {0}/{1}: objective={2:.6g}, chi2={3:.6g}".format(
                         start_index + 1,
                         len(iteration_starts),
+                        candidate_objective,
                         candidate_chi2,
                     )
                 )
 
         iteration_best = min(
             iteration_results,
-            key=lambda item: float(np.sum(item.fun * item.fun)),
+            key=_optimizer_objective_value,
         )
         iteration_diagnostics = []
         for start, item in zip(iteration_starts, iteration_results):
@@ -4125,6 +4161,8 @@ def fit_phoenix_full_spectrum(
                     "start": np.asarray(start, dtype=float).tolist(),
                     "solution": np.asarray(item.x, dtype=float).tolist(),
                     "chi2": float(np.sum(item.fun * item.fun)),
+                    "objective_value": _optimizer_objective_value(item),
+                    "optimizer_cost": float(item.cost),
                     "success": bool(item.success),
                     "status": int(item.status),
                     "nfev": int(item.nfev),
@@ -4134,7 +4172,7 @@ def fit_phoenix_full_spectrum(
 
     search_history = []
     expansion_count = 0
-    previous_iteration_chi2 = None
+    previous_iteration_objective = None
     current_start = np.asarray(p0, dtype=float)
     selected_iteration = None
     stop_reason = None
@@ -4158,6 +4196,7 @@ def fit_phoenix_full_spectrum(
         iteration_chi2 = float(
             np.sum(iteration_result.fun * iteration_result.fun)
         )
+        iteration_objective = _optimizer_objective_value(iteration_result)
         boundary = _local_grid_boundary_diagnostics(
             iteration_result.x,
             effective_grid_axes,
@@ -4165,10 +4204,10 @@ def fit_phoenix_full_spectrum(
             edge_fraction=local_grid_edge_fraction,
         )
         relative_improvement = None
-        if previous_iteration_chi2 is not None:
+        if previous_iteration_objective is not None:
             relative_improvement = float(
-                (previous_iteration_chi2 - iteration_chi2)
-                / max(abs(previous_iteration_chi2), np.finfo(float).eps)
+                (previous_iteration_objective - iteration_objective)
+                / max(abs(previous_iteration_objective), np.finfo(float).eps)
             )
         history_item = {
             "iteration": int(iteration_index),
@@ -4177,6 +4216,7 @@ def fit_phoenix_full_spectrum(
             "bound_restrictions": bound_restrictions,
             "solution": np.asarray(iteration_result.x, dtype=float).tolist(),
             "chi2": iteration_chi2,
+            "objective_value": iteration_objective,
             "relative_improvement": relative_improvement,
             "boundary": boundary,
             "multistart_diagnostics": iteration_multistart,
@@ -4187,11 +4227,12 @@ def fit_phoenix_full_spectrum(
             "starts": iteration_starts,
             "multistart_diagnostics": iteration_multistart,
             "chi2": iteration_chi2,
+            "objective_value": iteration_objective,
             "iteration": int(iteration_index),
         }
         if (
             selected_iteration is None
-            or iteration_chi2 < selected_iteration["chi2"]
+            or iteration_objective < selected_iteration["objective_value"]
         ):
             selected_iteration = candidate_iteration
 
@@ -4243,7 +4284,7 @@ def fit_phoenix_full_spectrum(
             effective_grid_axes,
             expansion_index=expansion_count,
         )
-        previous_iteration_chi2 = iteration_chi2
+        previous_iteration_objective = iteration_objective
         current_start = np.asarray(iteration_result.x, dtype=float)
 
     res = selected_iteration["result"]

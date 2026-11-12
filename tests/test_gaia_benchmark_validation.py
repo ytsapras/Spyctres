@@ -168,10 +168,91 @@ def test_gaia_benchmark_summary_reports_engineering_gates_and_aggregate_targets(
     teff_stats = payload["ordinary_aggregate_recovery"]["teff"]
     assert teff_stats["n"] == 1
     assert teff_stats["median_bias"] == pytest.approx(50.0)
+    assert teff_stats["median_signed_error"] == pytest.approx(50.0)
+    assert teff_stats["median_absolute_error"] == pytest.approx(50.0)
+    assert teff_stats["n_records_considered"] == 1
+    assert teff_stats["n_missing_reference"] == 0
     assert (
         payload["ordinary_aggregate_recovery"]["rv_kms"]["target_status"]
         == "not_evaluated_no_reference_deltas"
     )
+
+
+def test_gaia_benchmark_aggregate_metrics_do_not_hide_cancelling_errors():
+    records = [
+        {
+            "target_id": "positive",
+            "status": "ok",
+            "validation_role": "standard",
+            "reference": {"logg": 4.0},
+            "fit": {"logg": 4.8},
+        },
+        {
+            "target_id": "negative",
+            "status": "ok",
+            "validation_role": "standard",
+            "reference": {"logg": 4.0},
+            "fit": {"logg": 3.2},
+        },
+    ]
+
+    stats = gbs._aggregate_recovery_statistics(records)["logg"]
+
+    assert stats["median_signed_error"] == pytest.approx(0.0)
+    assert stats["abs_median_signed_error"] == pytest.approx(0.0)
+    assert stats["median_absolute_error"] == pytest.approx(0.8)
+    assert stats["mean_absolute_error"] == pytest.approx(0.8)
+    assert stats["rmse"] == pytest.approx(0.8)
+    assert stats["max_absolute_error"] == pytest.approx(0.8)
+    assert stats["tail_outlier_count"] == 2
+    assert stats["tail_outlier_fraction"] == pytest.approx(1.0)
+    assert {item["target_id"] for item in stats["tail_outliers"]} == {
+        "positive",
+        "negative",
+    }
+    assert stats["median_abs_bias"] == stats["abs_median_signed_error"]
+    assert "Deprecated compatibility alias" in stats["median_abs_bias_definition"]
+
+
+def test_gaia_benchmark_tolerance_pass_is_provisional_when_search_incomplete():
+    record = {
+        "target_id": "bounded",
+        "status": "ok",
+        "validation_role": "standard",
+        "reference": {"teff": 5800.0, "logg": 4.4, "feh": 0.0},
+        "fit": {
+            "success": True,
+            "teff": 5800.0,
+            "logg": 4.4,
+            "feh": 0.0,
+            "chi2_red": 1.0,
+        },
+        "fit_result": {
+            "search_coverage": {
+                "incomplete": True,
+                "boundary_unresolved": True,
+            },
+            "parameter_uncertainty": {"available": True},
+        },
+        "quality_flags": ["incomplete_search_coverage"],
+    }
+
+    recovery = gbs._recovery_record(record)
+    summary = gbs.summarize_payload([record])
+
+    assert recovery["parameter_tolerance_assessment"] == "within_first_pass_tolerance"
+    assert recovery["optimizer_success_assessment"] == "succeeded"
+    assert recovery["local_search_coverage_assessment"] == "incomplete"
+    assert (
+        recovery["recovery_readiness_assessment"]
+        == "provisional_within_tolerance_incomplete_search"
+    )
+    assert recovery["identifiability_assessment"] == (
+        "not_established_local_covariance_only"
+    )
+    assert summary["ordinary_tolerance_by_local_search_coverage"] == {
+        "within_first_pass_tolerance": {"incomplete": 1}
+    }
 
 
 def test_gaia_benchmark_diagnostic_window_set_and_error_floor_are_explicit():

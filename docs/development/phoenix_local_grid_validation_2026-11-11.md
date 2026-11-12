@@ -284,13 +284,19 @@ two required review. `status="ok"` in the runner means that optimization and
 report generation completed; it is not itself a statement of scientific
 accuracy.
 
-For the eight ordinary standards, the aggregate results were:
+For the eight ordinary standards, the original runner reported the following
+legacy aggregate quantities. The column originally called `median_abs_bias`
+is the absolute value of the median signed error, not the median absolute
+error; the label is corrected here to avoid that ambiguity.
 
-| Parameter | Median absolute bias | Robust scatter | Reporting target status |
-|---|---:|---:|---|
-| Teff | 73.2 K | 70.5 K | Meets target |
-| logg | 0.182 dex | 0.078 dex | Median bias outside the 0.15 dex target |
-| [Fe/H] | 0.164 dex | 0.159 dex | Median bias outside the 0.10 dex target |
+| Parameter | Absolute median signed error | Median absolute error | Robust scatter | Reporting target status |
+|---|---:|---:|---:|---|
+| Teff | 73.2 K | 109.5 K | 70.5 K | Meets target |
+| logg | 0.182 dex | 0.205 dex | 0.078 dex | Median signed-error target not met |
+| [Fe/H] | 0.164 dex | 0.164 dex | 0.159 dex | Median signed-error target not met |
+
+The complete corrected statistics and reliability cross-tab are documented in
+`reliable_fitting_followup_2026-11-12.md`.
 
 The stress and reference-flagged targets remain separate from ordinary
 aggregate statistics. In particular, HD 140283 remains outside review
