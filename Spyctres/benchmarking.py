@@ -7,19 +7,34 @@ questions separate before a spectrum can contribute to an accuracy claim:
 2. is the target inside the selected PHOENIX model family; and
 3. is the comparison parameter genuinely independent of spectral modelling.
 
+It also keeps those reference-informed benchmark questions separate from the
+automatic spectrum-only acceptance or abstention decision used by an ordinary
+Spyctres user.
+
 The helpers do not fit spectra and do not expose reference values to fitting
 code.  Validation runners may serialize their JSON-safe output as provenance.
 """
 
 from __future__ import annotations
 
+import math
 import re
 
 from .preprocessing import analysis_readiness_audit
 
 
-BENCHMARK_AUDIT_SCHEMA_VERSION = 1
+BENCHMARK_AUDIT_SCHEMA_VERSION = 2
 PHOENIX_HIRES_TEFF_RANGE_K = (2300.0, 12000.0)
+
+AUTOMATIC_CLASSIFICATION_STATUSES = frozenset(
+    {
+        "not_run",
+        "accepted",
+        "review_required",
+        "abstained",
+        "failed",
+    }
+)
 
 COHORT_ROLES = frozenset(
     {
@@ -62,6 +77,7 @@ _UNSUPPORTED_PHYSICS_FLAGS = frozenset(
         "s_star",
         "strong_emission",
         "composite_spectrum",
+        "long_period_variable",
     }
 )
 
@@ -74,6 +90,7 @@ _CONDITIONAL_PHYSICS_FLAGS = frozenset(
         "peculiar_abundances",
         "cool_giant",
         "metal_poor",
+        "late_m",
     }
 )
 
@@ -139,9 +156,17 @@ def phoenix_model_support(teff_K=None, physics_flags=None):
         status = "conditional"
     else:
         status = "supported"
+    reporting_track = {
+        "supported": "ordinary_supported",
+        "conditional": "conditional_supported",
+        "unsupported": "demonstrably_unsupported",
+    }[status]
     return {
         "status": status,
+        "reporting_track": reporting_track,
         "supported_for_main_accuracy": status == "supported",
+        "eligible_for_separate_accuracy_reporting": status
+        in {"supported", "conditional"},
         "teff_K_used_for_gate": value,
         "phoenix_hires_teff_range_K": list(PHOENIX_HIRES_TEFF_RANGE_K),
         "physics_flags": flags,
@@ -149,6 +174,41 @@ def phoenix_model_support(teff_K=None, physics_flags=None):
         "conditional_physics_flags": conditional_flags,
         "blockers": blockers,
         "warnings": warnings,
+    }
+
+
+def normalize_automatic_classification_decision(decision=None):
+    """Validate an automatic decision without consulting benchmark references.
+
+    The decision is supplied by a pre-registered spectrum-analysis workflow.
+    This helper deliberately accepts no reference temperature or catalogue
+    label.  A caller that records reference use fails closed for automatic
+    acceptance and false-confidence statistics.
+    """
+    supplied = dict(decision or {})
+    status = _normalize_token(supplied.get("status") or "not_run")
+    if status not in AUTOMATIC_CLASSIFICATION_STATUSES:
+        raise ValueError(
+            "Unknown automatic classification status {0!r}. Expected one of "
+            "{1}.".format(status, ", ".join(sorted(AUTOMATIC_CLASSIFICATION_STATUSES)))
+        )
+    reference_values_used = bool(supplied.get("reference_values_used", False))
+    blockers = []
+    if reference_values_used:
+        blockers.append("automatic_decision_used_reference_values")
+    if status == "not_run":
+        blockers.append("automatic_classification_not_run")
+    return {
+        "status": status,
+        "decision_source": str(
+            supplied.get("decision_source") or "pre_registered_spectrum_workflow"
+        ),
+        "reference_values_used": reference_values_used,
+        "valid_for_acceptance_metrics": not blockers,
+        "blockers": blockers,
+        "diagnostic_codes": sorted(
+            {str(code) for code in (supplied.get("diagnostic_codes") or [])}
+        ),
     }
 
 
@@ -163,13 +223,15 @@ def benchmark_candidate_audit(
     fit_windows=None,
     reference_values_visible_to_fitting=False,
     inspected_for_method_tuning=False,
+    automatic_decision=None,
 ):
     """Audit whether one target may contribute to benchmark statistics.
 
     ``holdout_candidate`` records are inventory-only.  Only a locked holdout
     with no leakage blockers can contribute to the primary external-accuracy
     report, and then only for parameters in ``primary_independent`` reference
-    tier.
+    tier. ``teff_K`` is a reference-informed cohort gate; it never determines
+    ``automatic_decision``.
     """
     role = _normalize_token(cohort_role)
     if role not in COHORT_ROLES:
@@ -182,7 +244,10 @@ def benchmark_candidate_audit(
         fit_windows=fit_windows,
         intended_use="benchmark_atmospheric_parameters",
     )
+    # This reference-informed gate defines benchmark-domain membership only.
+    # It must never be reused as the ordinary user's automatic decision.
     model_support = phoenix_model_support(teff_K=teff_K, physics_flags=physics_flags)
+    automatic = normalize_automatic_classification_decision(automatic_decision)
 
     leakage_blockers = []
     if role in {"holdout_candidate", "holdout_locked"}:
@@ -191,9 +256,12 @@ def benchmark_candidate_audit(
         if inspected_for_method_tuning:
             leakage_blockers.append("holdout_inspected_for_method_tuning")
 
+    instrument_product_ready = bool(readiness.get("analysis_ready"))
     instrument_model_ready = bool(
-        readiness.get("analysis_ready")
-        and model_support.get("supported_for_main_accuracy")
+        instrument_product_ready and model_support.get("supported_for_main_accuracy")
+    )
+    conditional_model_ready = bool(
+        instrument_product_ready and model_support.get("status") == "conditional"
     )
     primary_parameters = sorted(
         parameter
@@ -210,6 +278,17 @@ def benchmark_candidate_audit(
         instrument_model_ready
         and holdout_locked
         and primary_parameters
+        and not leakage_blockers
+    )
+    conditional_accuracy_eligible = bool(
+        conditional_model_ready
+        and holdout_locked
+        and primary_parameters
+        and not leakage_blockers
+    )
+    automatic_acceptance_metrics_eligible = bool(
+        holdout_locked
+        and automatic.get("valid_for_acceptance_metrics")
         and not leakage_blockers
     )
 
@@ -235,6 +314,17 @@ def benchmark_candidate_audit(
             "readiness": readiness,
         },
         "model_capability_gate": model_support,
+        "benchmark_eligibility_gate": {
+            "passed_for_ordinary_accuracy": bool(
+                instrument_model_ready and holdout_locked and not leakage_blockers
+            ),
+            "passed_for_conditional_reporting": bool(
+                conditional_model_ready and holdout_locked and not leakage_blockers
+            ),
+            "reference_informed": True,
+            "purpose": "cohort_membership_and_stratified_reference_scoring",
+        },
+        "automatic_classification_decision": automatic,
         "reference_tiers": tiers,
         "primary_accuracy_parameters": primary_parameters,
         "secondary_comparison_parameters": secondary_parameters,
@@ -248,6 +338,11 @@ def benchmark_candidate_audit(
         },
         "instrument_model_ready": instrument_model_ready,
         "main_accuracy_eligible": main_accuracy_eligible,
+        "conditional_accuracy_eligible": conditional_accuracy_eligible,
+        "accuracy_reporting_track": model_support.get("reporting_track"),
+        "automatic_acceptance_metrics_eligible": (
+            automatic_acceptance_metrics_eligible
+        ),
         "main_accuracy_eligibility_blockers": sorted(set(eligibility_blockers)),
     }
 
@@ -257,13 +352,110 @@ def normalize_star_alias(value):
     return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
 
 
+def _coerce_float(value):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if math.isfinite(result) else None
+
+
+def _propagate_position(identity, epoch_jyear):
+    """Linearly propagate one catalogue position for duplicate screening."""
+    ra = _coerce_float(identity.get("ra_deg"))
+    dec = _coerce_float(identity.get("dec_deg"))
+    epoch = _coerce_float(identity.get("epoch_jyear"))
+    if ra is None or dec is None:
+        return None
+    if epoch is None or epoch_jyear is None:
+        return ra, dec
+    dt = float(epoch_jyear) - epoch
+    pmra = _coerce_float(identity.get("pmra_mas_per_year"))
+    pmdec = _coerce_float(identity.get("pmdec_mas_per_year"))
+    if pmdec is not None:
+        dec += pmdec * dt / 3_600_000.0
+    if pmra is not None:
+        cos_dec = math.cos(math.radians(dec))
+        if abs(cos_dec) > 1.0e-8:
+            # Catalogue pmRA values are normally mu_alpha*cos(delta).
+            ra += pmra * dt / (3_600_000.0 * cos_dec)
+    return ra % 360.0, max(-90.0, min(90.0, dec))
+
+
+def _angular_separation_arcsec(first, second):
+    common_epoch = max(
+        value
+        for value in (
+            _coerce_float(first.get("epoch_jyear")) or 2000.0,
+            _coerce_float(second.get("epoch_jyear")) or 2000.0,
+        )
+    )
+    pos1 = _propagate_position(first, common_epoch)
+    pos2 = _propagate_position(second, common_epoch)
+    if pos1 is None or pos2 is None:
+        return None
+    ra1, dec1 = map(math.radians, pos1)
+    ra2, dec2 = map(math.radians, pos2)
+    cosine = (
+        math.sin(dec1) * math.sin(dec2)
+        + math.cos(dec1) * math.cos(dec2) * math.cos(ra1 - ra2)
+    )
+    return math.degrees(math.acos(max(-1.0, min(1.0, cosine)))) * 3600.0
+
+
 def audit_cohort_manifest(payload):
-    """Check star-level grouping and holdout leakage in a cohort manifest."""
+    """Check grouping, identity cross-matches and leakage in a cohort manifest."""
     targets = list((payload or {}).get("targets") or [])
+    development = list((payload or {}).get("excluded_development_identities") or [])
     errors = []
     warnings = []
     alias_owner = {}
+    catalogue_id_owner = {}
+    coordinate_records = []
     role_counts = {}
+    identity_cfg = dict((payload or {}).get("identity_crossmatch") or {})
+    match_radius_arcsec = _coerce_float(identity_cfg.get("match_radius_arcsec"))
+    if match_radius_arcsec is None:
+        match_radius_arcsec = 2.0
+
+    def register_identity(record, owner, *, is_development=False):
+        aliases = [record.get("target_id")] + list(record.get("aliases") or [])
+        normalized_aliases = {normalize_star_alias(alias) for alias in aliases}
+        normalized_aliases.discard("")
+        for alias in normalized_aliases:
+            previous = alias_owner.get(alias)
+            if previous is not None and previous != owner:
+                prefix = "development_overlap" if is_development or previous.startswith(
+                    "development:"
+                ) else "star_alias_overlap"
+                errors.append("{0}:{1}:{2}:{3}".format(prefix, alias, previous, owner))
+            alias_owner[alias] = owner
+
+        identity = dict(record.get("identity") or {})
+        for key in ("gaia_dr3_source_id", "gaia_dr2_source_id", "hipparcos_id"):
+            value = str(identity.get(key) or "").strip()
+            if not value:
+                continue
+            catalogue_key = "{0}:{1}".format(key, value)
+            previous = catalogue_id_owner.get(catalogue_key)
+            if previous is not None and previous != owner:
+                prefix = "development_identity_overlap" if (
+                    is_development or previous.startswith("development:")
+                ) else "catalogue_identity_overlap"
+                errors.append(
+                    "{0}:{1}:{2}:{3}".format(
+                        prefix, catalogue_key, previous, owner
+                    )
+                )
+            catalogue_id_owner[catalogue_key] = owner
+        if _propagate_position(identity, None) is not None:
+            coordinate_records.append((owner, identity, is_development))
+        return identity
+
+    for record in development:
+        dev_id = str(record.get("target_id") or "unknown").strip()
+        register_identity(record, "development:{0}".format(dev_id), is_development=True)
+
     for index, target in enumerate(targets):
         target_id = str(target.get("target_id") or "").strip()
         role = _normalize_token(target.get("cohort_role"))
@@ -273,16 +465,25 @@ def audit_cohort_manifest(payload):
         if role not in COHORT_ROLES:
             errors.append("{0}:invalid_cohort_role".format(target_id))
         role_counts[role or "missing"] = role_counts.get(role or "missing", 0) + 1
-        aliases = [target_id] + list(target.get("aliases") or [])
-        normalized_aliases = {normalize_star_alias(alias) for alias in aliases}
-        normalized_aliases.discard("")
-        for alias in normalized_aliases:
-            previous = alias_owner.get(alias)
-            if previous is not None and previous != target_id:
-                errors.append(
-                    "star_alias_overlap:{0}:{1}:{2}".format(alias, previous, target_id)
-                )
-            alias_owner[alias] = target_id
+        identity = register_identity(target, target_id)
+        identity_review = _normalize_token(target.get("identity_review_status"))
+        has_catalogue_identity = any(
+            identity.get(key)
+            for key in ("gaia_dr3_source_id", "gaia_dr2_source_id", "hipparcos_id")
+        )
+        has_position = _propagate_position(identity, None) is not None
+        if not has_catalogue_identity and not has_position:
+            message = "{0}:identity_not_crossmatchable".format(target_id)
+            if role == "holdout_locked":
+                errors.append(message)
+            else:
+                warnings.append(message)
+        if identity_review == "manual_review_required":
+            message = "{0}:manual_identity_review_pending".format(target_id)
+            if role == "holdout_locked":
+                errors.append(message)
+            else:
+                warnings.append(message)
         if role in {"holdout_candidate", "holdout_locked"}:
             forbidden = {
                 "fit",
@@ -304,11 +505,29 @@ def audit_cohort_manifest(payload):
         if not target.get("observations"):
             warnings.append("{0}:no_observations_inventoried".format(target_id))
 
+    for index, (owner1, identity1, dev1) in enumerate(coordinate_records):
+        for owner2, identity2, dev2 in coordinate_records[index + 1 :]:
+            separation = _angular_separation_arcsec(identity1, identity2)
+            if separation is None or separation > match_radius_arcsec:
+                continue
+            if owner1 == owner2:
+                continue
+            prefix = "development_coordinate_overlap" if dev1 or dev2 else (
+                "coordinate_identity_overlap"
+            )
+            errors.append(
+                "{0}:{1}:{2}:{3:.6f}arcsec".format(
+                    prefix, owner1, owner2, separation
+                )
+            )
+
     return {
         "schema_version": BENCHMARK_AUDIT_SCHEMA_VERSION,
         "valid": not errors,
         "n_targets": len(targets),
         "n_unique_aliases": len(alias_owner),
+        "n_unique_catalogue_ids": len(catalogue_id_owner),
+        "identity_match_radius_arcsec": match_radius_arcsec,
         "cohort_role_counts": dict(sorted(role_counts.items())),
         "errors": sorted(set(errors)),
         "warnings": sorted(set(warnings)),

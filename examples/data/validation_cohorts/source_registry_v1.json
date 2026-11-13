@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "registry_id": "spyctres_benchmark_sources_2026-11-13",
-  "status": "source_inventory_before_target_locking",
-  "purpose": "Product-specific capability and reference-quality inventory for a future star-grouped Spyctres benchmark. This is not yet the locked 60-star cohort.",
+  "status": "source_inventory_with_proposed_star_level_cohort",
+  "purpose": "Product-specific capability and reference-quality inventory for a future star-grouped Spyctres benchmark. The 60+12 proposal is in proposed_cohort_v1.json; it is not locked, downloaded, or fitted.",
+  "proposed_target_inventory": "proposed_cohort_v1.json",
   "model_family": {
     "name": "PHOENIX-ACES HiRes",
     "teff_range_K": [2300.0, 12000.0],
@@ -23,7 +24,10 @@
     "development_target_aliases_must_not_enter_holdout": true,
     "holdout_reference_values_visible_to_fitting": false,
     "holdout_results_may_inform_current_method_tuning": false,
-    "automatic_and_human_assisted_results_are_separate": true
+    "automatic_and_human_assisted_results_are_separate": true,
+    "benchmark_eligibility_may_use_independent_references": true,
+    "automatic_classification_may_use_reference_values": false,
+    "ordinary_conditional_and_unsupported_tracks_are_reported_separately": true
   },
   "pre_registered_reporting": {
     "star_level_bootstrap": true,
@@ -136,7 +140,7 @@
         "feh": "secondary_spectroscopic",
         "spectral_type": "secondary_catalogue"
       },
-      "notes": "Vacuum wavelengths, masks and wavelength-dependent LSF dispersion are supplied. Parameter VAC values combine spectral-modelling methods and are secondary comparisons, not independent truth."
+      "notes": "Vacuum wavelengths, masks and wavelength-dependent LSF dispersion are supplied. Even the four homogenized-resolution products retain a supplied common LSF curve as a function of wavelength; they are not permission to substitute one constant R. Parameter VAC values combine spectral-modelling methods and are secondary comparisons, not independent truth."
     },
     {
       "source_id": "miles",

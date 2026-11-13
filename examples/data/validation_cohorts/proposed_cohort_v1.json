@@ -1,0 +1,3867 @@
+{
+  "schema_version": 2,
+  "inventory_id": "spyctres_external_benchmark_proposal_2026-11-13",
+  "status": "proposed_not_locked_not_downloaded_not_fitted",
+  "purpose": "Reviewer-facing star-level proposal for approval before spectra are downloaded or holdout results are inspected.",
+  "leakage_policy": {
+    "holdout_results_inspected": false,
+    "holdout_spectra_downloaded": false,
+    "numeric_reference_values_stored_in_fitting_manifest": false,
+    "reference_values_visible_to_fitting": false,
+    "automatic_decision_must_use_reference_values": false,
+    "automatic_and_reference_informed_decisions_are_scored_separately": true
+  },
+  "identity_crossmatch": {
+    "match_radius_arcsec": 2.0,
+    "proper_motion_propagation": "linear propagation to the later catalogue epoch when pmRA/pmDec are available",
+    "locking_rule": "Resolve every manual_review_required record and re-run alias, catalogue-ID and coordinate checks before holdout_locked.",
+    "gaia_note": "Gaia DR2 and DR3 identifiers are release-qualified and are not assumed equal across releases."
+  },
+  "selection_summary": {
+    "holdout_candidate_targets": 60,
+    "stress_targets": 12,
+    "unique_star_count": 72,
+    "reporting_track_counts": {
+      "ordinary_supported": 60,
+      "conditional_supported": 6,
+      "demonstrably_unsupported": 6
+    },
+    "gbsv3_stratum_quotas": {
+      "F Dwarf (V)": 8,
+      "F Subgiant (IV)": 5,
+      "G Dwarf (V)": 10,
+      "G Giant (III)": 1,
+      "G Subgiant (IV)": 5,
+      "K Dwarf (V)": 8,
+      "K Giant (III)": 18,
+      "K Subgiant (IV)": 5
+    },
+    "selection_method": "Select 60 ordinary-supported GBS stars within pre-set HR-diagram strata, evenly across published metallicity ordering, after excluding bundled development stars, indirect-diameter/SB2 flags, and conditional model-suitability flags. Place conditional and unsupported diversity cases in a separate 12-star sensitivity/stress set. Numeric reference values were used only for inventory stratification and are not copied into this fitting manifest."
+  },
+  "download_footprint": {
+    "status": "estimate_only_no_holdout_download_performed",
+    "gbsv3_62_expected_bytes": 260901348,
+    "xsl_dr2_10_expected_bytes": 9331200,
+    "total_expected_bytes": 270232548,
+    "total_expected_mib": 257.71,
+    "basis": "Mean sizes of the 12 bundled GBSv3 R42KNorm files and three bundled XSL DR2 three-arm sets.",
+    "checksums": "Record SHA-256 after approval and download; none are claimed in this proposal."
+  },
+  "source_urls": {
+    "gbsv3_library": "https://www.blancocuaresma.com/s/benchmarkstars",
+    "gbsv3_reference": "https://doi.org/10.1051/0004-6361/202347136",
+    "gbsv3_spectral_library_reference": "https://doi.org/10.1051/0004-6361/202555211",
+    "gaia_archive": "https://gea.esac.esa.int/archive/",
+    "xsl_dr2_catalogue": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+    "xsl_dr2_release": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+    "xsl_dr2_reference": "https://doi.org/10.1051/0004-6361/201936825"
+  },
+  "excluded_development_identities": [
+    {
+      "target_id": "HIP37279",
+      "aliases": [
+        "HIP37279",
+        "HD61421",
+        "Procyon"
+      ]
+    },
+    {
+      "target_id": "HIP69673",
+      "aliases": [
+        "HIP69673",
+        "HD124897",
+        "Arcturus"
+      ]
+    },
+    {
+      "target_id": "HIP76976",
+      "aliases": [
+        "HIP76976",
+        "HD140283",
+        "HD140283"
+      ]
+    },
+    {
+      "target_id": "HIP79672",
+      "aliases": [
+        "HIP79672",
+        "HD146233",
+        "18 Sco"
+      ]
+    },
+    {
+      "target_id": "HIP101345",
+      "aliases": [
+        "HIP101345",
+        "HD195564",
+        "HD195564"
+      ]
+    },
+    {
+      "target_id": "HIP12530",
+      "aliases": [
+        "HIP12530",
+        "HD16765",
+        "HD16765"
+      ]
+    },
+    {
+      "target_id": "HIP14086",
+      "aliases": [
+        "HIP14086",
+        "HD18907",
+        "Epsilon Fornacis"
+      ]
+    },
+    {
+      "target_id": "HIP43587",
+      "aliases": [
+        "HIP43587",
+        "HD75732",
+        "55 Cancri"
+      ]
+    },
+    {
+      "target_id": "HIP45343",
+      "aliases": [
+        "HIP45343",
+        "HD79210",
+        "HD79210"
+      ]
+    },
+    {
+      "target_id": "HIP48455",
+      "aliases": [
+        "HIP48455",
+        "HD85503",
+        "Mu Leonis"
+      ]
+    },
+    {
+      "target_id": "HIP57360",
+      "aliases": [
+        "HIP57360",
+        "HD102200",
+        "HD102200"
+      ]
+    },
+    {
+      "target_id": "HIP95447",
+      "aliases": [
+        "HIP95447",
+        "HD182572",
+        "HD182572"
+      ]
+    },
+    {
+      "target_id": "X0116",
+      "aliases": [
+        "HD 57060"
+      ]
+    },
+    {
+      "target_id": "X0245",
+      "aliases": [
+        "HD 147550"
+      ]
+    },
+    {
+      "target_id": "X0646",
+      "aliases": [
+        "HD 175058"
+      ]
+    },
+    {
+      "target_id": "X0900",
+      "aliases": [
+        "HD 110885"
+      ]
+    },
+    {
+      "target_id": "X0843",
+      "aliases": [
+        "BD-01 1792"
+      ]
+    },
+    {
+      "target_id": "X0379",
+      "aliases": [
+        "HD 119802"
+      ]
+    },
+    {
+      "target_id": "MD002",
+      "aliases": [
+        "LTT 2544"
+      ]
+    },
+    {
+      "target_id": "X0119",
+      "aliases": [
+        "[M2002] LMC 148035"
+      ]
+    },
+    {
+      "target_id": "X0013",
+      "aliases": [
+        "ISO-MCMS J005712.2-730704"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "target_id": "HIP32851",
+      "aliases": [
+        "HIP32851",
+        "HD49933"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "32851",
+        "gaia_dr3_source_id": "3113219383954556416",
+        "ra_deg": 102.70772041649637,
+        "dec_deg": -0.5417075404341039,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 20.551575274761728,
+        "pmdec_mas_per_year": -186.22943723851486,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP32851_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP32851_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP32851_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP78072",
+      "aliases": [
+        "HIP78072",
+        "HD142860"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "78072",
+        "gaia_dr3_source_id": "1193030490492925824",
+        "ra_deg": 239.11469743534354,
+        "dec_deg": 15.655912590196278,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 311.18254717012934,
+        "pmdec_mas_per_year": -1282.7670369101927,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP78072_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP78072_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP78072_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP61317",
+      "aliases": [
+        "HIP61317",
+        "HD109358"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "61317",
+        "gaia_dr3_source_id": "1534011998572555776",
+        "ra_deg": 188.43142838333532,
+        "dec_deg": 41.358776694084185,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -704.7021193540293,
+        "pmdec_mas_per_year": 292.15465992124564,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP61317_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP61317_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP61317_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP93427",
+      "aliases": [
+        "HIP93427",
+        "HD177153"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "93427",
+        "gaia_dr3_source_id": "2103877089862772352",
+        "ra_deg": 285.4148641043247,
+        "dec_deg": 41.49022994276989,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -77.7308328841156,
+        "pmdec_mas_per_year": 31.229976630218744,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP93427_ELODIE",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ELODIE",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP93427_ELODIE_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP93427_ELODIE_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP70497",
+      "aliases": [
+        "HIP70497",
+        "HD126660"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "70497",
+        "gaia_dr3_source_id": "1604859511344724864",
+        "ra_deg": 216.2974561533579,
+        "dec_deg": 51.84896726025888,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -235.96991928915273,
+        "pmdec_mas_per_year": -399.6956968159237,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP70497_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP70497_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP70497_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP96441",
+      "aliases": [
+        "HIP96441",
+        "HD185395"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "96441",
+        "gaia_dr3_source_id": "2135110401277424384",
+        "ra_deg": 294.1105137988449,
+        "dec_deg": 50.22227321404957,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -5.854439709270821,
+        "pmdec_mas_per_year": 263.6604096992894,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP96441_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP96441_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP96441_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP22449",
+      "aliases": [
+        "HIP22449",
+        "HD30652"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "22449",
+        "gaia_dr3_source_id": "3288921720025503360",
+        "ra_deg": 72.46212402119102,
+        "dec_deg": 6.9613310085374644,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 463.9544034849098,
+        "pmdec_mas_per_year": 11.937009936843957,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP22449_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP22449_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP22449_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP63584",
+      "aliases": [
+        "HIP63584",
+        "HD113337"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "63584",
+        "gaia_dr3_source_id": "1676282377934772608",
+        "ra_deg": 195.44379543261408,
+        "dec_deg": 63.61033145834716,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -173.34232184470318,
+        "pmdec_mas_per_year": 24.84979791113281,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP63584_FIES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FIES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP63584_FIES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP63584_FIES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP112447",
+      "aliases": [
+        "HIP112447",
+        "HD215648"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "112447",
+        "gaia_dr3_source_id": "2719475542667772416",
+        "ra_deg": 341.67431037726243,
+        "dec_deg": 12.170694096276746,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 233.35407535031928,
+        "pmdec_mas_per_year": -493.1325502914664,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP112447_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP112447_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP112447_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP94755",
+      "aliases": [
+        "HIP94755",
+        "HD181096"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "94755",
+        "gaia_dr3_source_id": "2127789646700855040",
+        "ra_deg": 289.2140419513524,
+        "dec_deg": 47.00040363072439,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -10.222323125691972,
+        "pmdec_mas_per_year": 292.4121334092275,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP94755_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP94755_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP94755_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP92043",
+      "aliases": [
+        "HIP92043",
+        "HD173667"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "92043",
+        "gaia_dr3_source_id": "4530744134231683840",
+        "ra_deg": 281.4154805359527,
+        "dec_deg": 20.544817390173186,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -9.0864737300157,
+        "pmdec_mas_per_year": -335.65510379164584,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP92043_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP92043_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP92043_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP108535",
+      "aliases": [
+        "HIP108535",
+        "HD209369"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "108535",
+        "gaia_dr3_source_id": "2278918344568877056",
+        "ra_deg": 329.81131902680943,
+        "dec_deg": 73.1791836180336,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -67.99442734777753,
+        "pmdec_mas_per_year": -160.07586763687772,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "F Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP108535_CAFE",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "CAFE",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP108535_CAFE_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP108535_CAFE_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP67927",
+      "aliases": [
+        "HIP67927",
+        "HD121370",
+        "etaBoo"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "67927",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 208.67131828784778,
+        "dec_deg": 18.39858670408873,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": -60.95,
+        "pmdec_mas_per_year": -356.29,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "F Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP67927_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP67927_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP67927_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP5336",
+      "aliases": [
+        "HIP5336",
+        "HD6582",
+        "muCas"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "5336",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 17.05383814314063,
+        "dec_deg": 54.92422782146291,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": 3422.23,
+        "pmdec_mas_per_year": -1598.93,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP5336_FIES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FIES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP5336_FIES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP5336_FIES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP27435",
+      "aliases": [
+        "HIP27435",
+        "HD38858"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "27435",
+        "gaia_dr3_source_id": "3023711269067191296",
+        "ra_deg": 87.1458581131804,
+        "dec_deg": -4.095664047742017,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 61.42699725421628,
+        "pmdec_mas_per_year": -229.29120099564255,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP27435_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP27435_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP27435_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP56997",
+      "aliases": [
+        "HIP56997",
+        "HD101501"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "56997",
+        "gaia_dr3_source_id": "4025850731201819392",
+        "ra_deg": 175.26250050618376,
+        "dec_deg": 34.19993957543697,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -12.521605057437956,
+        "pmdec_mas_per_year": -381.1958714817105,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP56997_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP56997_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP56997_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP16852",
+      "aliases": [
+        "HIP16852",
+        "HD22484"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "16852",
+        "gaia_dr3_source_id": "3263836568394170880",
+        "ra_deg": 54.21723179468776,
+        "dec_deg": 0.3995245948754849,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -232.56337140161065,
+        "pmdec_mas_per_year": -481.4722822856589,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP16852_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP16852_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP16852_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP544",
+      "aliases": [
+        "HIP544",
+        "HD166"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "544",
+        "gaia_dr3_source_id": "2860924621205256704",
+        "ra_deg": 1.655198904590879,
+        "dec_deg": 29.02071363055181,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 380.1592537624844,
+        "pmdec_mas_per_year": -177.729603753582,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP544_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP544_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP544_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP77052",
+      "aliases": [
+        "HIP77052",
+        "HD140538"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "77052",
+        "gaia_dr3_source_id": "4423865487962417152",
+        "ra_deg": 236.0077577795403,
+        "dec_deg": 2.5158114040341424,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": null,
+        "pmdec_mas_per_year": null,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP77052_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP77052_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP77052_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP81300",
+      "aliases": [
+        "HIP81300",
+        "HD149661"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "81300",
+        "gaia_dr3_source_id": "4358031335898505472",
+        "ra_deg": 249.09140230088192,
+        "dec_deg": -2.3259612815161246,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 456.0583031942775,
+        "pmdec_mas_per_year": -309.2240972920396,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP81300_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP81300_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP81300_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP3093",
+      "aliases": [
+        "HIP3093",
+        "HD3651"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "3093",
+        "gaia_dr3_source_id": "2802397960855105920",
+        "ra_deg": 9.838652915455736,
+        "dec_deg": 21.24883304644718,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -461.94828899560946,
+        "pmdec_mas_per_year": -369.6242681666145,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP3093_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP3093_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP3093_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP71681",
+      "aliases": [
+        "HIP71681",
+        "HD128621",
+        "alfCenB"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "71681",
+        "gaia_dr3_source_id": "5877748442128924544",
+        "ra_deg": 219.91439118508794,
+        "dec_deg": -60.83947067669964,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": null,
+        "pmdec_mas_per_year": null,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP71681_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP71681_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP71681_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP86974",
+      "aliases": [
+        "HIP86974",
+        "HD161797"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "86974",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 266.61549529882734,
+        "dec_deg": 27.722499164391017,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": -291.66,
+        "pmdec_mas_per_year": -749.6,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "G Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP86974_ELODIE",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ELODIE",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP86974_ELODIE_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP86974_ELODIE_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP47908",
+      "aliases": [
+        "HIP47908",
+        "HD84441"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "47908",
+        "gaia_dr3_source_id": "641662895638787584",
+        "ra_deg": 146.46258258682883,
+        "dec_deg": 23.7742057827888,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -46.15399801533371,
+        "pmdec_mas_per_year": -10.798759173770152,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP47908_FIES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FIES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP47908_FIES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP47908_FIES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP15776",
+      "aliases": [
+        "HIP15776",
+        "HD21019"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "15776",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 50.823748372200086,
+        "dec_deg": -7.793564529132291,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": 2.2,
+        "pmdec_mas_per_year": -219.27,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "G Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP15776_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP15776_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP15776_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP74975",
+      "aliases": [
+        "HIP74975",
+        "HD136202"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "74975",
+        "gaia_dr3_source_id": "4421455530273900032",
+        "ra_deg": 229.82997775153595,
+        "dec_deg": 1.763125183445368,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 372.21640655243027,
+        "pmdec_mas_per_year": -513.4827696911725,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP74975_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP74975_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP74975_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP65721",
+      "aliases": [
+        "HIP65721",
+        "HD117176"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "65721",
+        "gaia_dr3_source_id": "3740176925743994752",
+        "ra_deg": 202.10645605299496,
+        "dec_deg": 13.776228558320799,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -235.95077478512644,
+        "pmdec_mas_per_year": -575.9692081932296,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP65721_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP65721_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP65721_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP8159",
+      "aliases": [
+        "HIP8159",
+        "HD10697"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "8159",
+        "gaia_dr3_source_id": "95652018353917056",
+        "ra_deg": 26.232401137403862,
+        "dec_deg": 20.082682764562314,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -43.35720974527688,
+        "pmdec_mas_per_year": -104.9361893289388,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP8159_HERMES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HERMES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP8159_HERMES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP8159_HERMES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP14954",
+      "aliases": [
+        "HIP14954",
+        "HD19994"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "14954",
+        "gaia_dr3_source_id": "3265335443260522112",
+        "ra_deg": 48.194346115429944,
+        "dec_deg": -1.1964050113001996,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 193.54884716032865,
+        "pmdec_mas_per_year": -68.8884844240555,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "G Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP14954_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP14954_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP14954_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP104217",
+      "aliases": [
+        "HIP104217",
+        "HD201092",
+        "61CygB"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "104217",
+        "gaia_dr3_source_id": "1872046574983497216",
+        "ra_deg": 316.753662752556,
+        "dec_deg": 38.75607277205679,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 4105.976428209489,
+        "pmdec_mas_per_year": 3155.9416398273515,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP104217_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP104217_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP104217_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP85235",
+      "aliases": [
+        "HIP85235",
+        "HD158633"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "85235",
+        "gaia_dr3_source_id": "1637110042813188608",
+        "ra_deg": 261.24428143354027,
+        "dec_deg": 67.30672951368193,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -531.7492966789252,
+        "pmdec_mas_per_year": 4.8177533768137515,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP85235_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP85235_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP85235_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP19849",
+      "aliases": [
+        "HIP19849",
+        "HD26965"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "19849",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 63.82349252596032,
+        "dec_deg": -7.644558569538802,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": -2240.12,
+        "pmdec_mas_per_year": -3420.27,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP19849_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP19849_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP19849_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP49908",
+      "aliases": [
+        "HIP49908",
+        "HD88230"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "49908",
+        "gaia_dr3_source_id": "823773494718931968",
+        "ra_deg": 152.8329289582321,
+        "dec_deg": 49.451988897100506,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -1363.2871863986295,
+        "pmdec_mas_per_year": -505.77035887491877,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP49908_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP49908_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP49908_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP12114",
+      "aliases": [
+        "HIP12114",
+        "HD16160"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "12114",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 39.01596871317506,
+        "dec_deg": 6.883364417500196,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": 1807.78,
+        "pmdec_mas_per_year": 1444.02,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP12114_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP12114_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP12114_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP16537",
+      "aliases": [
+        "HIP16537",
+        "HD22049",
+        "epsEri"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "16537",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 53.23509021798133,
+        "dec_deg": -9.45830603660428,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": -975.17,
+        "pmdec_mas_per_year": 19.49,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP16537_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP16537_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP16537_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP73184",
+      "aliases": [
+        "HIP73184",
+        "HD131977"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "73184",
+        "gaia_dr3_source_id": "6232511606838403968",
+        "ra_deg": 224.37159427348143,
+        "dec_deg": -21.423140396261676,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 1031.4718694823848,
+        "pmdec_mas_per_year": -1723.6189029383202,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP73184_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP73184_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP73184_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP114622",
+      "aliases": [
+        "HIP114622",
+        "HD219134"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "114622",
+        "gaia_dr3_source_id": "2009481748875806976",
+        "ra_deg": 348.33773395483047,
+        "dec_deg": 57.16966644274312,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 2074.413511999184,
+        "pmdec_mas_per_year": 294.4519772796575,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Dwarf (V)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP114622_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP114622_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP114622_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP3031",
+      "aliases": [
+        "HIP3031",
+        "HD3546"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "3031",
+        "gaia_dr3_source_id": "2858181236614036864",
+        "ra_deg": 9.637781933874779,
+        "dec_deg": 29.310627871477646,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -228.70125383496188,
+        "pmdec_mas_per_year": -253.20623674283314,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP3031_HERMES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HERMES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP3031_HERMES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP3031_HERMES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP4257",
+      "aliases": [
+        "HIP4257",
+        "HD5268"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "4257",
+        "gaia_dr3_source_id": "2474456351444863744",
+        "ra_deg": 13.57337858863854,
+        "dec_deg": -8.740878221485216,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 16.74312346612569,
+        "pmdec_mas_per_year": -48.222341684478096,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP4257_HERMES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HERMES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP4257_HERMES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP4257_HERMES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP12486",
+      "aliases": [
+        "HIP12486",
+        "HD16815"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "12486",
+        "gaia_dr3_source_id": "4951967794731342464",
+        "ra_deg": 40.167596942337,
+        "dec_deg": -39.85549757179939,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 135.60050667714432,
+        "pmdec_mas_per_year": -27.234929023507405,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP12486_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP12486_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP12486_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP17738",
+      "aliases": [
+        "HIP17738",
+        "HD23940"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "17738",
+        "gaia_dr3_source_id": "4887842970929434880",
+        "ra_deg": 56.98363469226377,
+        "dec_deg": -30.16891124545046,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 25.93154326643034,
+        "pmdec_mas_per_year": -231.39996705665482,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP17738_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP17738_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP17738_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP30565",
+      "aliases": [
+        "HIP30565",
+        "HD46116"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "30565",
+        "gaia_dr3_source_id": "5278762854038923008",
+        "ra_deg": 96.36913851401884,
+        "dec_deg": -69.68940761792547,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -12.184160954737559,
+        "pmdec_mas_per_year": 200.7859657790035,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP30565_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP30565_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP30565_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP17595",
+      "aliases": [
+        "HIP17595",
+        "HD23526"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "17595",
+        "gaia_dr3_source_id": "3276860524145383040",
+        "ra_deg": 56.539012191173754,
+        "dec_deg": 6.803286024429257,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -0.6921032009563093,
+        "pmdec_mas_per_year": -53.69428411062092,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP17595_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP17595_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP17595_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP671",
+      "aliases": [
+        "HIP671",
+        "HD360"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "671",
+        "gaia_dr3_source_id": "2429415922764859392",
+        "ra_deg": 2.072898155266828,
+        "dec_deg": -8.824266634446369,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -34.159620340183345,
+        "pmdec_mas_per_year": -34.87735693682182,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP671_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP671_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP671_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP27621",
+      "aliases": [
+        "HIP27621",
+        "HD39640"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "27621",
+        "gaia_dr3_source_id": "4792305954618472960",
+        "ra_deg": 87.7217775501848,
+        "dec_deg": -52.10921489900183,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 2.952625001472523,
+        "pmdec_mas_per_year": -76.65076197465555,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP27621_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP27621_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP27621_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP36444",
+      "aliases": [
+        "HIP36444",
+        "HD60060"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "36444",
+        "gaia_dr3_source_id": "5492531416535100672",
+        "ra_deg": 112.49867426916161,
+        "dec_deg": -52.65091694455081,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -23.1928786833589,
+        "pmdec_mas_per_year": 53.97144853213498,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP36444_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP36444_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP36444_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP26019",
+      "aliases": [
+        "HIP26019",
+        "HD36874"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "26019",
+        "gaia_dr3_source_id": "4822128906148720128",
+        "ra_deg": 83.28132240614411,
+        "dec_deg": -35.139493800200356,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 99.63692594748754,
+        "pmdec_mas_per_year": -26.90612828119563,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP26019_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP26019_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP26019_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP112748",
+      "aliases": [
+        "HIP112748",
+        "HD216131"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "112748",
+        "gaia_dr3_source_id": "1876510592179455744",
+        "ra_deg": 342.50151443616926,
+        "dec_deg": 24.60139285847616,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 145.24028980212034,
+        "pmdec_mas_per_year": -42.39560113284592,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP112748_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP112748_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP112748_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP29575",
+      "aliases": [
+        "HIP29575",
+        "HD43023"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "29575",
+        "gaia_dr3_source_id": "3021524580959406592",
+        "ra_deg": 93.47589357153039,
+        "dec_deg": -3.741276780293853,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -18.239245603077343,
+        "pmdec_mas_per_year": 21.217524119915527,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP29575_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP29575_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP29575_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP112440",
+      "aliases": [
+        "HIP112440",
+        "HD215665"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "112440",
+        "gaia_dr3_source_id": "1876331990259358976",
+        "ra_deg": 341.63310142716244,
+        "dec_deg": 23.565612345440783,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 57.086454536667084,
+        "pmdec_mas_per_year": -9.84475236246848,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP112440_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP112440_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP112440_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP27530",
+      "aliases": [
+        "HIP27530",
+        "HD39523"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "hipparcos_id": "27530",
+        "gaia_dr3_source_id": null,
+        "ra_deg": 87.45657006297395,
+        "dec_deg": -56.16648845940416,
+        "epoch_jyear": 1991.25,
+        "pmra_mas_per_year": 81.13,
+        "pmdec_mas_per_year": -71.12,
+        "identity_source": "ESA Hipparcos new reduction; no Gaia DR3 best-neighbour row"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP27530_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP27530_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP27530_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP63608",
+      "aliases": [
+        "HIP63608",
+        "HD113226",
+        "epsVir"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "63608",
+        "gaia_dr3_source_id": "3736865265441207424",
+        "ra_deg": 195.54291476874843,
+        "dec_deg": 10.95923674149768,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -273.792912720649,
+        "pmdec_mas_per_year": 19.803882348563043,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP63608_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP63608_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP63608_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP115620",
+      "aliases": [
+        "HIP115620",
+        "HD220572"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "115620",
+        "gaia_dr3_source_id": "6498723334930624512",
+        "ra_deg": 351.33179307410404,
+        "dec_deg": -56.84907148360336,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 84.88149879109696,
+        "pmdec_mas_per_year": -19.737056854179624,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP115620_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP115620_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP115620_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP96837",
+      "aliases": [
+        "HIP96837",
+        "HD185958"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "96837",
+        "gaia_dr3_source_id": "1823991938314881152",
+        "ra_deg": 295.26228375975774,
+        "dec_deg": 17.4758952424771,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 8.179719426213115,
+        "pmdec_mas_per_year": -33.11305387903911,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP96837_HERMES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HERMES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP96837_HERMES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP96837_HERMES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP25993",
+      "aliases": [
+        "HIP25993",
+        "HD36848"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "25993",
+        "gaia_dr3_source_id": "4808960875719316608",
+        "ra_deg": 83.2144962349797,
+        "dec_deg": -38.51341833164325,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 48.47505790068993,
+        "pmdec_mas_per_year": -10.95892921731113,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP25993_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP25993_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP25993_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP102422",
+      "aliases": [
+        "HIP102422",
+        "HD198149"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "102422",
+        "gaia_dr3_source_id": "2195115561168483712",
+        "ra_deg": 311.32320634108095,
+        "dec_deg": 61.84241929401267,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 85.99344103538436,
+        "pmdec_mas_per_year": 818.4511251587252,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP102422_NARVAL",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "NARVAL",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP102422_NARVAL_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP102422_NARVAL_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP98036",
+      "aliases": [
+        "HIP98036",
+        "HD188512"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "98036",
+        "gaia_dr3_source_id": "4296708789290712064",
+        "ra_deg": 298.8285089900959,
+        "dec_deg": 6.404626612168723,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 45.943752101692965,
+        "pmdec_mas_per_year": -480.9649180671844,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP98036_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP98036_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP98036_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP50887",
+      "aliases": [
+        "HIP50887",
+        "HD90043"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "50887",
+        "gaia_dr3_source_id": "3830897080395058048",
+        "ra_deg": 155.86849574856893,
+        "dec_deg": -0.9024047899638477,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 64.84014031279213,
+        "pmdec_mas_per_year": -35.28997033155312,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP50887_ESPADONS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "ESPADONS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP50887_ESPADONS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP50887_ESPADONS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP89047",
+      "aliases": [
+        "HIP89047",
+        "HD167042"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "89047",
+        "gaia_dr3_source_id": "2149564787289902848",
+        "ra_deg": 272.63265239009786,
+        "dec_deg": 54.28765269401475,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 107.63033879509808,
+        "pmdec_mas_per_year": 247.34469567396977,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP89047_CAFE",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "CAFE",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP89047_CAFE_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP89047_CAFE_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP17378",
+      "aliases": [
+        "HIP17378",
+        "HD23249",
+        "delEri"
+      ],
+      "cohort_role": "holdout_candidate",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "17378",
+        "gaia_dr3_source_id": "5164120762333028736",
+        "ra_deg": 55.811663307520355,
+        "dec_deg": -9.760083664068041,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -93.63405683015571,
+        "pmdec_mas_per_year": 744.3603877012735,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Subgiant (IV)",
+      "benchmark_domain": {
+        "reporting_track": "ordinary_supported",
+        "physics_flags": [],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP17378_FEROS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "FEROS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP17378_FEROS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP17378_FEROS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP115227",
+      "aliases": [
+        "HIP115227",
+        "HD220009"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "115227",
+        "gaia_dr3_source_id": "2661005953843811456",
+        "ra_deg": 350.08611451666513,
+        "dec_deg": 5.381042277393145,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 78.81078050145044,
+        "pmdec_mas_per_year": -59.761476743511466,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "cool_giant"
+        ],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP115227_HARPS",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HARPS",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP115227_HARPS_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP115227_HARPS_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "HIP2413",
+      "aliases": [
+        "HIP2413",
+        "HD2665"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "hipparcos_id": "2413",
+        "gaia_dr3_source_id": "421805237748755968",
+        "ra_deg": 7.689702843431229,
+        "dec_deg": 57.06460933581743,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 41.66887825311878,
+        "pmdec_mas_per_year": -64.7128822857321,
+        "identity_source": "ESA Gaia DR3 Hipparcos-2 best-neighbour crossmatch"
+      },
+      "stellar_stratum": "K Giant (III)",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "metal_poor"
+        ],
+        "basis": "GBSv3 independent reference inventory; numeric reference values are not stored in this fitting manifest"
+      },
+      "reference_source": "soubiran2024_gbsv3_and_casamiquela2026_library",
+      "reference_tiers": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "unavailable",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "HIP2413_HERMES",
+          "source_id": "gbsv3_r42knorm",
+          "instrument": "HERMES",
+          "product_family": "GBSv3_R42KNorm",
+          "filename": "HIP2413_HERMES_1_R42KNorm.txt.gz",
+          "source_url": "https://www.blancocuaresma.com/s/repository/gaia_benchmark_stars_library/2025/all/HIP2413_HERMES_1_R42KNorm.txt.gz",
+          "expected_bytes": 4208086,
+          "size_status": "estimated_from_12_bundled_same-format_products",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "ready_for_candidate_inventory",
+          "downloaded_for_holdout": false
+        }
+      ]
+    },
+    {
+      "target_id": "X0133",
+      "aliases": [
+        "HD 96446"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "5338490937045044096",
+        "gaia_dr3_source_id": "5338490937045044096",
+        "ra_deg": 166.52416734540446,
+        "dec_deg": -59.94986468111325,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -10.210749784438903,
+        "pmdec_mas_per_year": 3.20078496861133,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.27722573
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "peculiar_abundances"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0133",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0133",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "He-rich; preferred over the wavy-NIR X0085 observation."
+        }
+      ]
+    },
+    {
+      "target_id": "X0420",
+      "aliases": [
+        "SV* HV 11223"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4688885036243911936",
+        "gaia_dr3_source_id": "4688885036243911936",
+        "ra_deg": 8.006672421165892,
+        "dec_deg": -73.37633971626617,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 0.5640369167468711,
+        "pmdec_mas_per_year": -1.1752328677568606,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.09670462
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "s_star"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0420",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0420",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "S-star with confirmed ZrO signature."
+        }
+      ]
+    },
+    {
+      "target_id": "X0248",
+      "aliases": [
+        "HD 190073"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4248713560548849792",
+        "gaia_dr3_source_id": "4248713560548849792",
+        "ra_deg": 300.7604595498972,
+        "dec_deg": 5.737919397160403,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 0.41467552272078373,
+        "pmdec_mas_per_year": -9.430194299003745,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.19272326
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "strong_emission",
+          "composite_spectrum"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0248",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0248",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Herbig Ae/Be star with numerous emission lines and cool-component NIR continuum."
+        }
+      ]
+    },
+    {
+      "target_id": "X0513",
+      "aliases": [
+        "CL* NGC 419 LE 35"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4687224911112149888",
+        "gaia_dr3_source_id": "4687224911112149888",
+        "ra_deg": 17.07284509820986,
+        "dec_deg": -72.88372209474394,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 1.162515740391538,
+        "pmdec_mas_per_year": -2.2552176606121352,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.75598
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "carbon_star",
+          "composite_spectrum"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0513",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0513",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Carbon star contaminated by a nearby hotter star below 450 nm."
+        }
+      ]
+    },
+    {
+      "target_id": "X0653",
+      "aliases": [
+        "HD 172488"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4155626054317058048",
+        "gaia_dr3_source_id": "4155626054317058048",
+        "ra_deg": 280.20016347853385,
+        "dec_deg": -8.718904742473208,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -10.890759857434164,
+        "pmdec_mas_per_year": -22.919645686893233,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.21679108
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "peculiar_abundances"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0653",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0653",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Possibly He-rich; UVB arm unavailable and continuum reliability flagged."
+        }
+      ]
+    },
+    {
+      "target_id": "X0675",
+      "aliases": [
+        "V874 Aql"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4311447192936936576",
+        "gaia_dr3_source_id": "4311447192936936576",
+        "ra_deg": 281.42113706316314,
+        "dec_deg": 9.64405235203079,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -1.7522444066801284,
+        "pmdec_mas_per_year": -3.5397333347479565,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.3344432
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "long_period_variable"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0675",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0675",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "O-rich long-period variable; later complete observation selected."
+        }
+      ]
+    },
+    {
+      "target_id": "X0131",
+      "aliases": [
+        "LHS 2065"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "5761985432616501376",
+        "gaia_dr3_source_id": "5761985432616501376",
+        "ra_deg": 133.39836837028676,
+        "dec_deg": -3.4931644292214545,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -516.6053978978886,
+        "pmdec_mas_per_year": -199.65184645561013,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.14373347
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "late_m",
+          "activity"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0131",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0131",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Very late active M dwarf; UVB arm lacks usable signal."
+        }
+      ]
+    },
+    {
+      "target_id": "X0587",
+      "aliases": [
+        "IRAS 10151-6008?"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "manual_review_required",
+      "identity": {
+        "gaia_dr2_source_id": "5254915438961230720",
+        "gaia_dr3_source_id": "5254915438961230720",
+        "ra_deg": 154.21545785671503,
+        "dec_deg": -60.39631113508431,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -7.983751496323086,
+        "pmdec_mas_per_year": 2.9221570756284523,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.1306152
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "long_period_variable"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0587",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0587",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "O-rich source whose historical name/counterpart is explicitly questioned by XSL."
+        }
+      ]
+    },
+    {
+      "target_id": "X0790",
+      "aliases": [
+        "Feige 110"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "2633603478379307904",
+        "gaia_dr3_source_id": "2633603478379307904",
+        "ra_deg": 349.9932939389364,
+        "dec_deg": -5.165605725589494,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": -8.533091203444364,
+        "pmdec_mas_per_year": -0.5918280433037506,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.2523776
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "demonstrably_unsupported",
+        "physics_flags": [
+          "white_dwarf"
+        ],
+        "basis": "published XSL DR2 product/physics note; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0790",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0790",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Hot subdwarf/compact-star stress case; individual visits have poor NIR S/N."
+        }
+      ]
+    },
+    {
+      "target_id": "X0163",
+      "aliases": [
+        "HD 174240"
+      ],
+      "cohort_role": "stress",
+      "identity_review_status": "catalogue_crossmatch_verified",
+      "identity": {
+        "gaia_dr2_source_id": "4266584541504540928",
+        "gaia_dr3_source_id": "4266584541504540928",
+        "ra_deg": 282.40503192504946,
+        "dec_deg": 0.8361248727719218,
+        "epoch_jyear": 2016.0,
+        "pmra_mas_per_year": 13.864226340369779,
+        "pmdec_mas_per_year": -16.04938217459593,
+        "identity_source": "XSL DR2 published Gaia ID plus ESA Gaia DR2-to-DR3 neighbourhood nearest match",
+        "gaia_dr2_dr3_angular_distance_arcsec": 0.14497
+      },
+      "stellar_stratum": "XSL peculiar_or_product_stress",
+      "benchmark_domain": {
+        "reporting_track": "conditional_supported",
+        "physics_flags": [
+          "a_star"
+        ],
+        "basis": "published XSL A1V catalogue type; no fit result inspected"
+      },
+      "reference_source": "xsl_dr2_catalogue_and_published_product_notes",
+      "reference_tiers": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "rv_kms": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      },
+      "reference_values_visible_to_fitting": false,
+      "observations": [
+        {
+          "observation_id": "X0163",
+          "source_id": "xsl_dr2",
+          "instrument": "XSHOOTER",
+          "product_family": "XSL_DR2_separate_arms",
+          "archive_product_id": "X0163",
+          "source_url": "https://xsl.u-strasbg.fr/page_dr2_all.html",
+          "archive_discovery_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+          "expected_bytes": 933120,
+          "size_status": "estimated_from_three_bundled_matched_DR2_arm_sets",
+          "sha256": null,
+          "checksum_status": "pending_download",
+          "instrument_gate_status": "blocked_pending_product_specific_reader",
+          "downloaded_for_holdout": false,
+          "quality_note": "Normal A1V conditional-support case with all three X-SHOOTER arms present."
+        }
+      ]
+    }
+  ]
+}

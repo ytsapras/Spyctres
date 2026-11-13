@@ -199,8 +199,14 @@ envelope for archival and reviewer-facing products.
      contribute to the primary independent tier, while spectroscopically
      derived metallicities and survey/catalogue parameters remain secondary
      comparisons;
+   - reference-informed benchmark eligibility and spectrum-only automatic
+     classification are distinct decisions. Catalogue Teff or spectral type
+     may stratify the benchmark but must never drive automatic acceptance,
+     abstention, or the false-confidence denominator;
    - all files, visits, releases, aliases, and cross-instrument observations of
-     one star share one development/holdout assignment;
+     one star share one development/holdout assignment. Before locking, match
+     release-qualified Gaia IDs and proper-motion-aware sky coordinates and
+     manually resolve ambiguous identities rather than relying on aliases;
    - the current bundled Gaia benchmarks and any target inspected during method
      development are immutable development cases, not future holdout successes;
    - automatic baseline and human-assisted results remain separate, and blinded
@@ -215,6 +221,19 @@ envelope for archival and reviewer-facing products.
    automatic acceptance fraction and severe-error rate among accepted results,
    not only median errors. P4 must not begin until these rules and the required
    instrument models have been tested without inspecting holdout outcomes.
+
+   The current proposal is recorded in
+   `examples/data/validation_cohorts/proposed_cohort_v1.json`: 60 ordinary
+   supported GBS candidates plus a separate 12-star set split equally between
+   conditional and unsupported cases. It remains an un-downloaded,
+   un-fitted proposal until the outstanding identity reviews and scientific
+   approval are complete.
+
+   Example 9 is a pre-holdout acceptance criterion, not a deferred optional
+   example. It must preserve the automatic result, support blinded annotation
+   and controlled mask/window variants, write a versioned rationale sidecar,
+   keep the human-assisted refit separate, and distinguish improved independent
+   recovery from a merely smaller in-sample residual.
 
 7. **Quickscan/refine calibration and throughput.**
    Continue the quality-gated quickscan/refine approach for batches of tens to

@@ -73,11 +73,16 @@ official archive documentation.
   Its manifest records parameter-specific reference policy; indirect-angular-
   diameter cases override Teff/logg to `secondary_indirect`.
 - `examples/data/validation_cohorts/source_registry_v1.json` records the first
-  product-family readiness matrix and the pre-registered reporting rules. It is
-  explicitly a source inventory, not a claim that a 60-star holdout has already
-  been locked.
-- Star-alias overlap and obvious holdout post-fit/reference leakage can be
-  detected with `audit_cohort_manifest()`.
+  product-family readiness matrix and the pre-registered reporting rules.
+- `examples/data/validation_cohorts/proposed_cohort_v1.json` now records 60
+  ordinary supported GBS candidates and a separate 12-star conditional/stress
+  set. It is an un-downloaded, un-fitted proposal rather than a locked holdout.
+- Alias, Gaia/Hipparcos ID, proper-motion-aware coordinate overlap and obvious
+  holdout post-fit/reference leakage can be detected with
+  `audit_cohort_manifest()`. Nine manual identity reviews remain open.
+- Benchmark-domain eligibility and automatic classification are serialized as
+  separate decisions. Only the former may use independent references; the
+  latter fails closed for acceptance metrics if reference use is recorded.
 
 Baseline inspection began at commit `5615cd3`. The eight modified numbered
 notebooks and untracked `CODE_REVIEW_RECOMMENDATIONS.md` were treated as
@@ -95,12 +100,18 @@ document.
 
 ### P1: cohort inventory and instrument gates
 
-Complete the star-level >=60 supported-candidate plus >=12 stress inventory
-without fitting or inspecting reference discrepancies. Each target needs stable
+The star-level inventory is now proposed without fitting or inspecting
+reference discrepancies. Each target records stable
 aliases, one cohort assignment, observation/product IDs, source URLs,
-checksums/expected sizes, quality flags, reader feasibility, LSF/frame status,
+pending checksums/expected sizes, quality flags, reader feasibility, LSF/frame status,
 and per-parameter reference tier. GBSv3 should anchor primary FGK Teff/logg;
 XSL and survey catalogues extend diversity mainly in secondary tiers.
+
+Before locking, resolve the nine manual identity reviews, obtain scientific
+approval for the star/stratum list, download only the approved products, record
+actual sizes and SHA-256 values, and rerun the manifest audit. The detailed
+proposal and caveats are in
+`docs/development/proposed_external_benchmark_inventory_2026-11-13.md`.
 
 The immediate engineering prerequisite is a fixed, supplied
 wavelength-dependent LSF convolution with synthetic constant-curve equivalence,
@@ -110,10 +121,12 @@ that path and a product-specific reader are validated.
 
 ### P2: expert review on development stars
 
-Create Example 9 as a small script/notebook pair using versioned sidecars.
+Create Example 9 as a required pre-holdout script/notebook pair using versioned sidecars.
 Demonstrate one flagged and one apparently clean development fit. Review is
 blinded initially, the automatic result is immutable, and review-triggered
-variants are reported separately.
+variants are reported separately. Acceptance requires sidecar provenance and
+immutability tests and an explicit post-unblinding distinction between improved
+independent parameter recovery and a residual-only improvement.
 
 ### P3: falsifiable development diagnoses
 
