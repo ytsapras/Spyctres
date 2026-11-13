@@ -187,6 +187,35 @@ envelope for archival and reviewer-facing products.
    demonstrate identifiable information beyond this baseline. XSL DR3 is an
    already merged comparison product, not independent truth for arm stitching.
 
+   External benchmark work now follows an explicit capability and leakage gate:
+
+   - a product may enter headline accuracy statistics only after wavelength
+     medium, observer/stellar frame, masks, uncertainties, and the LSF actually
+     applied by the fitter have been verified for that product family;
+   - an active tabulated/wavelength-dependent LSF is a reviewed-analysis
+     blocker until the forward model supports it. In particular, MaStar and
+     SDSS `wdisp` products must not be approximated silently by one constant R;
+   - reference quality is parameter-specific. GBSv3 fundamental Teff/logg may
+     contribute to the primary independent tier, while spectroscopically
+     derived metallicities and survey/catalogue parameters remain secondary
+     comparisons;
+   - all files, visits, releases, aliases, and cross-instrument observations of
+     one star share one development/holdout assignment;
+   - the current bundled Gaia benchmarks and any target inspected during method
+     development are immutable development cases, not future holdout successes;
+   - automatic baseline and human-assisted results remain separate, and blinded
+     review includes both flagged cases and apparently clean fits; and
+   - failure diagnoses may end as a demonstrated cause, a supported but
+     unconfirmed hypothesis, or an unresolved failure.
+
+   Before the main holdout run, freeze the star-grouped cohort, instrument
+   capability matrix, parameter-specific reference tiers, review protocol,
+   severe-error definition, class/instrument grouping, star-level bootstrap and
+   confidence-interval rules. Sparse groups are exploratory. Report the
+   automatic acceptance fraction and severe-error rate among accepted results,
+   not only median errors. P4 must not begin until these rules and the required
+   instrument models have been tested without inspecting holdout outcomes.
+
 7. **Quickscan/refine calibration and throughput.**
    Continue the quality-gated quickscan/refine approach for batches of tens to
    hundreds of spectra, but measure more than runtime. Track false narrowing:

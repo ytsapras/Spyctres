@@ -66,6 +66,12 @@ from Spyctres._serialization import (
 )
 from Spyctres.fitting import reconstruct_phoenix_legendre_models_for_segments
 from Spyctres.phoenix import PhoenixLibrary
+from Spyctres.benchmarking import (
+    PRIMARY_REFERENCE_TIERS,
+    SECONDARY_REFERENCE_TIERS,
+    benchmark_candidate_audit,
+    normalize_reference_tiers,
+)
 
 
 DEFAULT_MANIFEST = REPO_ROOT / "examples" / "data" / "gaia_benchmark" / "manifest.json"
@@ -387,16 +393,20 @@ def _atomic_write_csv(path, payload):
         "hd",
         "spectral_type",
         "validation_role",
+        "cohort_role",
         "status",
         "teff_ref",
+        "teff_reference_tier",
         "teff_fit",
         "delta_teff",
         "teff_assessment",
         "logg_ref",
+        "logg_reference_tier",
         "logg_fit",
         "delta_logg",
         "logg_assessment",
         "feh_ref",
+        "feh_reference_tier",
         "feh_fit",
         "delta_feh",
         "feh_assessment",
@@ -516,6 +526,18 @@ def _reference(row):
         "logg": _float_or_none(row.get("logg_ref")),
         "feh": _float_or_none(row.get("feh_ref")),
     }
+
+
+def _reference_tiers(row, reference_policy=None):
+    tiers = {}
+    for parameter, definition in dict(reference_policy or {}).items():
+        key = "rv_kms" if str(parameter).strip().lower() in {"rv", "rv_kms"} else parameter
+        if isinstance(definition, dict):
+            tiers[key] = definition.get("tier", "unspecified")
+        else:
+            tiers[key] = definition
+    tiers.update(dict(row.get("reference_tier_overrides") or {}))
+    return normalize_reference_tiers(tiers)
 
 
 def _float_or_none(value):
@@ -751,12 +773,22 @@ def _robust_scatter(values):
     return 1.4826 * mad
 
 
-def _aggregate_recovery_statistics(records):
+def _aggregate_recovery_statistics(records, allowed_reference_tiers=None):
     stats = {}
+    allowed_reference_tiers = (
+        None
+        if allowed_reference_tiers is None
+        else {str(item) for item in allowed_reference_tiers}
+    )
     for param in ("teff", "logg", "feh", "rv_kms"):
         deltas = []
         labelled_deltas = []
+        excluded_reference_tier = 0
         for record in records:
+            tier = str((record.get("reference_tiers") or {}).get(param, "unspecified"))
+            if allowed_reference_tiers is not None and tier not in allowed_reference_tiers:
+                excluded_reference_tier += 1
+                continue
             record_deltas, _assessments = _fit_deltas(record)
             delta = _float_or_none(record_deltas.get(param))
             if delta is not None:
@@ -776,7 +808,10 @@ def _aggregate_recovery_statistics(records):
             stats[param] = {
                 "n": 0,
                 "n_records_considered": int(len(records)),
-                "n_missing_reference": int(len(records)),
+                "n_excluded_reference_tier": int(excluded_reference_tier),
+                "n_missing_reference": int(
+                    len(records) - excluded_reference_tier
+                ),
                 "median_bias": None,
                 "median_abs_bias": None,
                 "median_abs_bias_definition": (
@@ -822,7 +857,10 @@ def _aggregate_recovery_statistics(records):
         stats[param] = {
             "n": int(arr.size),
             "n_records_considered": int(len(records)),
-            "n_missing_reference": int(len(records) - arr.size),
+            "n_excluded_reference_tier": int(excluded_reference_tier),
+            "n_missing_reference": int(
+                len(records) - excluded_reference_tier - arr.size
+            ),
             # Compatibility aliases retain their historical semantics.
             "median_bias": median_signed_error,
             "median_abs_bias": abs_median_signed_error,
@@ -859,6 +897,7 @@ def _csv_row(record):
     segment = record.get("segment") or {}
     setup = record.get("setup") or {}
     fit_policy = record.get("fit_policy") or {}
+    reference_tiers = record.get("reference_tiers") or {}
     fit_kwargs = ((record.get("fit_policy") or {}).get("fit_kwargs") or {})
     regions = fit_kwargs.get("regions") or ((setup.get("fit_kwargs") or {}).get("regions") or [])
     width = 0.0
@@ -871,16 +910,20 @@ def _csv_row(record):
         "hd": record.get("hd"),
         "spectral_type": record.get("spectral_type"),
         "validation_role": record.get("validation_role"),
+        "cohort_role": record.get("cohort_role"),
         "status": record.get("status"),
         "teff_ref": reference.get("teff"),
+        "teff_reference_tier": reference_tiers.get("teff"),
         "teff_fit": fit.get("teff"),
         "delta_teff": deltas.get("teff"),
         "teff_assessment": assessments.get("teff"),
         "logg_ref": reference.get("logg"),
+        "logg_reference_tier": reference_tiers.get("logg"),
         "logg_fit": fit.get("logg"),
         "delta_logg": deltas.get("logg"),
         "logg_assessment": assessments.get("logg"),
         "feh_ref": reference.get("feh"),
+        "feh_reference_tier": reference_tiers.get("feh"),
         "feh_fit": fit.get("feh"),
         "delta_feh": deltas.get("feh"),
         "feh_assessment": assessments.get("feh"),
@@ -929,6 +972,13 @@ def summarize_payload(records):
         tolerance = _overall_assessment(record)
         coverage = _local_search_coverage_assessment(record)
         tolerance_by_coverage.setdefault(tolerance, Counter())[coverage] += 1
+    reference_tier_counts = {}
+    for parameter in ("teff", "logg", "feh", "rv_kms", "spectral_type"):
+        counts = Counter(
+            str((record.get("reference_tiers") or {}).get(parameter, "unspecified"))
+            for record in ordinary
+        )
+        reference_tier_counts[parameter] = dict(sorted(counts.items()))
     return {
         "n_records": int(len(records)),
         "by_status": dict(sorted(statuses.items())),
@@ -952,6 +1002,15 @@ def summarize_payload(records):
         "ordinary_aggregate_recovery_targets": AGGREGATE_RECOVERY_TARGETS,
         "tail_absolute_error_thresholds": TAIL_ABSOLUTE_ERROR_THRESHOLDS,
         "ordinary_aggregate_recovery": _aggregate_recovery_statistics(ordinary),
+        "reference_tier_counts": reference_tier_counts,
+        "primary_independent_aggregate_recovery": _aggregate_recovery_statistics(
+            ordinary,
+            allowed_reference_tiers=PRIMARY_REFERENCE_TIERS,
+        ),
+        "secondary_comparison_aggregate_recovery": _aggregate_recovery_statistics(
+            ordinary,
+            allowed_reference_tiers=SECONDARY_REFERENCE_TIERS,
+        ),
         "aggregate_metric_definitions": {
             "median_signed_error": "median(fit - reference)",
             "abs_median_signed_error": "absolute value of median(fit - reference)",
@@ -964,6 +1023,7 @@ def summarize_payload(records):
         },
         "notes": [
             "Reference parameters are used only for post-fit deltas.",
+            "Primary independent and secondary model/catalogue comparisons are reported separately by parameter.",
             "Stress/diagnostic targets are reported separately from ordinary recovery statistics.",
             "Aggregate recovery targets are reporting goals for ordinary FGK samples, not per-star tuning criteria.",
             "Formal fit quality is reported separately from parameter recovery because high-S/N benchmark spectra can be dominated by model/systematic residuals.",
@@ -1370,7 +1430,31 @@ def _fit_record(segment, row, setup_payload, fit_kwargs, args, phoenix_lib):
     }
 
 
-def _base_record(row, segment, setup_payload, fit_kwargs, args):
+def _base_record(row, segment, setup_payload, fit_kwargs, args, manifest_payload=None):
+    manifest_payload = dict(manifest_payload or {})
+    cohort_policy = dict(manifest_payload.get("cohort_policy") or {})
+    cohort_role = str(row.get("cohort_role") or cohort_policy.get("cohort_role") or "development")
+    reference_tiers = _reference_tiers(
+        row,
+        reference_policy=manifest_payload.get("reference_policy"),
+    )
+    role = str(row.get("validation_role", "standard")).lower()
+    physics_flags = []
+    if "metal_poor" in role:
+        physics_flags.append("metal_poor")
+    if "cool" in role:
+        physics_flags.append("cool_giant")
+    capability_gate = benchmark_candidate_audit(
+        segment,
+        target_id=_target_id(row),
+        cohort_role=cohort_role,
+        reference_tiers=reference_tiers,
+        teff_K=_float_or_none(row.get("teff_ref")),
+        physics_flags=physics_flags,
+        fit_windows=fit_kwargs.get("regions"),
+        reference_values_visible_to_fitting=False,
+        inspected_for_method_tuning=cohort_role == "development",
+    )
     return {
         "target_id": _target_id(row),
         "hd": row.get("hd"),
@@ -1378,8 +1462,11 @@ def _base_record(row, segment, setup_payload, fit_kwargs, args):
         "file": row.get("file"),
         "spectral_type": row.get("spectral_type"),
         "validation_role": row.get("validation_role", "standard"),
+        "cohort_role": cohort_role,
         "notes": row.get("notes"),
         "reference": _reference(row),
+        "reference_tiers": reference_tiers,
+        "benchmark_capability_gate": capability_gate,
         "source": {
             "source_url": row.get("source_url"),
             "source_instrument": row.get("source_instrument"),
@@ -1416,6 +1503,8 @@ def build_payload(manifest_path, manifest_payload, records, args):
             "source_page": manifest_payload.get("source_page"),
             "source_release": manifest_payload.get("source_release"),
             "citations": manifest_payload.get("citations", []),
+            "cohort_policy": manifest_payload.get("cohort_policy"),
+            "reference_policy": manifest_payload.get("reference_policy"),
         },
         "run_policy": {
             "run_fits": bool(args.run_fits),
@@ -1483,7 +1572,14 @@ def main(argv=None):
             )
             setup_payload = setup.to_dict()
             fit_kwargs = _benchmark_fit_kwargs(setup_payload, args, row=row)
-            record = _base_record(row, segment, setup_payload, fit_kwargs, args)
+            record = _base_record(
+                row,
+                segment,
+                setup_payload,
+                fit_kwargs,
+                args,
+                manifest_payload=manifest_payload,
+            )
             if args.run_fits:
                 print("  Running PHOENIX benchmark recovery fit...", flush=True)
                 record.update(_fit_record(segment, row, setup_payload, fit_kwargs, args, phoenix_lib))

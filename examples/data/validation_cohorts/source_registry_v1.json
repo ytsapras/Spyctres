@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "registry_id": "spyctres_benchmark_sources_2026-11-13",
+  "status": "source_inventory_before_target_locking",
+  "purpose": "Product-specific capability and reference-quality inventory for a future star-grouped Spyctres benchmark. This is not yet the locked 60-star cohort.",
+  "model_family": {
+    "name": "PHOENIX-ACES HiRes",
+    "teff_range_K": [2300.0, 12000.0],
+    "ordinary_accuracy_exclusions": [
+      "O stars and early-B stars outside the installed grid",
+      "white dwarfs and Wolf-Rayet stars",
+      "carbon and S stars",
+      "strong-emission and composite spectra",
+      "other targets whose dominant physics is absent from the selected grid"
+    ]
+  },
+  "cohort_rules": {
+    "supported_holdout_target": 60,
+    "stress_target_minimum": 12,
+    "grouping_unit": "unique_star",
+    "same_star_different_release_counts_once": true,
+    "same_star_repeated_observations_count_once_for_accuracy_denominator": true,
+    "development_target_aliases_must_not_enter_holdout": true,
+    "holdout_reference_values_visible_to_fitting": false,
+    "holdout_results_may_inform_current_method_tuning": false,
+    "automatic_and_human_assisted_results_are_separate": true
+  },
+  "pre_registered_reporting": {
+    "star_level_bootstrap": true,
+    "confidence_intervals": true,
+    "automatic_acceptance_fraction": true,
+    "severe_error_rate_among_accepted": true,
+    "group_by": ["stellar_class", "luminosity_class", "instrument_product_family"],
+    "small_group_policy": "Label sparse subgroups exploratory rather than reporting a precise accuracy claim.",
+    "failure_diagnosis_outcomes": [
+      "demonstrated_cause",
+      "supported_unconfirmed_hypothesis",
+      "unresolved_failure"
+    ]
+  },
+  "sources": [
+    {
+      "source_id": "gbsv3_r42knorm",
+      "product_family": "Gaia FGK Benchmark Stars v3 common R=42000 normalized library",
+      "official_url": "https://www.blancocuaresma.com/s/benchmarkstars",
+      "reference_url": "https://doi.org/10.1051/0004-6361/202347136",
+      "spectral_regime": "FGK",
+      "resolution_tier": "high",
+      "reader": "gbs_v3_ascii",
+      "instrument_gate_status": "ready_for_candidate_inventory",
+      "reference_policy": {
+        "teff": "primary_independent",
+        "logg": "primary_independent",
+        "feh": "secondary_spectroscopic",
+        "spectral_type": "morphology_only"
+      },
+      "notes": "Use unique-star grouping across the multiple source spectrographs. Stars flagged with indirect angular diameters require secondary/reference-flagged treatment."
+    },
+    {
+      "source_id": "xsl_dr2",
+      "product_family": "XSL DR2 separate UVB/VIS/NIR arms",
+      "official_url": "https://www.eso.org/rm/api/v1/public/releaseDescriptions/150",
+      "reference_url": "https://doi.org/10.1051/0004-6361/201936825",
+      "spectral_regime": "O-M plus peculiar",
+      "resolution_tier": "intermediate",
+      "reader": null,
+      "instrument_gate_status": "blocked_pending_product_specific_reader",
+      "reference_policy": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "spectral_type": "morphology_only"
+      },
+      "notes": "Air wavelengths and stellar-rest correction are documented. Preserve per-arm SPEC_RES, REST_VAL, LOSS_COR and quality metadata; do not stitch or rescale on ingestion."
+    },
+    {
+      "source_id": "xsl_dr3",
+      "product_family": "XSL DR3 merged spectra",
+      "official_url": "https://xsl.astro.unistra.fr/page_dr3.html",
+      "reference_url": "https://doi.org/10.1051/0004-6361/202142388",
+      "spectral_regime": "O-M plus peculiar",
+      "resolution_tier": "intermediate",
+      "reader": "xsl_dr3",
+      "instrument_gate_status": "conditional_product_audit_required",
+      "reference_policy": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "spectral_type": "morphology_only"
+      },
+      "notes": "Merged/scaled rest-frame product. Do not treat XSL DR2 and DR3 versions of one observation as independent targets or use DR3 as truth for arm stitching."
+    },
+    {
+      "source_id": "uves_pop",
+      "product_family": "UVES Paranal Observatory Project",
+      "official_url": "https://www.eso.org/sci/observing/tools/uvespop.html",
+      "spectral_regime": "broad stellar atlas",
+      "resolution_tier": "high",
+      "reader": "uves_pop_ascii",
+      "instrument_gate_status": "conditional_native_product_audit_required",
+      "reference_policy": {
+        "teff": "unspecified",
+        "logg": "unspecified",
+        "feh": "unspecified",
+        "spectral_type": "secondary_catalogue"
+      },
+      "notes": "Inspect the selected native product's wavelength convention, heliocentric rebinning, uncertainty availability, artifacts and effective LSF before accuracy use."
+    },
+    {
+      "source_id": "sdss_segue",
+      "product_family": "SDSS/SEGUE spec FITS",
+      "official_url": "https://www.sdss4.org/dr17/spectro/spectro_basics/",
+      "spectral_regime": "survey stellar spectra",
+      "resolution_tier": "low",
+      "reader": "sdss_spec",
+      "instrument_gate_status": "blocked_for_main_accuracy_until_tabulated_lsf_supported_or_restricted_product_justified",
+      "reference_policy": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "spectral_type": "secondary_catalogue"
+      },
+      "notes": "Vacuum log-wavelength products. The reader can preserve per-pixel wdisp, but the current fitter rejects active tabulated LSF descriptors."
+    },
+    {
+      "source_id": "mastar_dr17",
+      "product_family": "SDSS DR17 MaStar visit spectra",
+      "official_url": "https://www.sdss4.org/dr17/mastar/mastar-spectra/",
+      "spectral_regime": "broad stellar library",
+      "resolution_tier": "low",
+      "reader": null,
+      "instrument_gate_status": "blocked_pending_reader_and_wavelength_dependent_lsf_support",
+      "reference_policy": {
+        "teff": "secondary_spectroscopic",
+        "logg": "secondary_spectroscopic",
+        "feh": "secondary_spectroscopic",
+        "spectral_type": "secondary_catalogue"
+      },
+      "notes": "Vacuum wavelengths, masks and wavelength-dependent LSF dispersion are supplied. Parameter VAC values combine spectral-modelling methods and are secondary comparisons, not independent truth."
+    },
+    {
+      "source_id": "miles",
+      "product_family": "MILES stellar library",
+      "official_url": "https://doi.org/10.1051/0004-6361/201116842",
+      "spectral_regime": "broad stellar library",
+      "resolution_tier": "low",
+      "reader": null,
+      "instrument_gate_status": "blocked_pending_reader_and_product_audit",
+      "reference_policy": {
+        "teff": "secondary_catalogue",
+        "logg": "secondary_catalogue",
+        "feh": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      }
+    },
+    {
+      "source_id": "elodie_3_1",
+      "product_family": "ELODIE 3.1",
+      "official_url": "https://dc.g-vo.org/rr/q/lp/custom/CDS.VizieR/III/251",
+      "spectral_regime": "broad stellar library",
+      "resolution_tier": "high_or_intermediate_by_product",
+      "reader": null,
+      "instrument_gate_status": "blocked_pending_reader_and_product_audit",
+      "reference_policy": {
+        "teff": "secondary_catalogue",
+        "logg": "secondary_catalogue",
+        "feh": "secondary_catalogue",
+        "spectral_type": "morphology_only"
+      }
+    }
+  ]
+}

@@ -178,6 +178,30 @@ def test_gaia_benchmark_summary_reports_engineering_gates_and_aggregate_targets(
     )
 
 
+def test_gaia_benchmark_summary_separates_independent_and_secondary_references():
+    record = {
+        "status": "ok",
+        "validation_role": "standard",
+        "reference": {"teff": 5800.0, "logg": 4.4, "feh": 0.0},
+        "reference_tiers": {
+            "teff": "primary_independent",
+            "logg": "primary_independent",
+            "feh": "secondary_spectroscopic",
+        },
+        "fit": {"teff": 5850.0, "logg": 4.5, "feh": 0.1},
+    }
+
+    summary = gbs.summarize_payload([record])
+
+    assert summary["primary_independent_aggregate_recovery"]["teff"]["n"] == 1
+    assert summary["primary_independent_aggregate_recovery"]["logg"]["n"] == 1
+    assert summary["primary_independent_aggregate_recovery"]["feh"]["n"] == 0
+    assert summary["secondary_comparison_aggregate_recovery"]["feh"]["n"] == 1
+    assert summary["reference_tier_counts"]["feh"] == {
+        "secondary_spectroscopic": 1
+    }
+
+
 def test_gaia_benchmark_aggregate_metrics_do_not_hide_cancelling_errors():
     records = [
         {

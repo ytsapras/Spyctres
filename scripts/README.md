@@ -87,7 +87,13 @@ scientific than smoke tests.
   statistics. The recovery summary distinguishes signed bias from absolute
   errors and tail failures, and it does not treat optimizer completion,
   parameter tolerance, grid coverage, residual quality, identifiability, or
-  scientific review as interchangeable states.
+  scientific review as interchangeable states. The bundled manifest is an
+  immutable development cohort. The runner records an instrument/model
+  capability gate and reports fundamental Teff/logg references separately
+  from secondary spectroscopic [Fe/H] comparisons; its legacy mixed aggregate
+  remains for output compatibility. A product with an active tabulated
+  wavelength-dependent LSF is blocked from benchmark accuracy use until that
+  LSF is supported by the forward model.
 - `diagnostic_window_audit.py` runs the PHOENIX-free diagnostic-window selector
   over a manifest, such as the bundled XSL Figure 1 validation manifest, and
   writes role-aware JSON/CSV summaries plus an optional top-window heatmap. Use

@@ -568,9 +568,12 @@ precision SDSS LSF modelling. PHOENIX fitting examples recommend
 provenance. If a standard SDSS `wdisp` column is present, Spyctres preserves it
 with `lsf_source="sdss_wdisp_not_applied"` and can attach an opt-in tabulated
 `sigma_kms` descriptor via `read_sdss_spec(..., attach_wdisp_resolution=True)`.
-The current PHOENIX fitter still requires constant LSF broadening, so the
-readiness audit warns when SDSS tabulated LSF is present but the likelihood is
-using a constant-R assumption. UVES-POP spectra carry a nominal `R=80000`
+The current PHOENIX fitter still requires constant LSF broadening. An attached
+tabulated descriptor therefore raises the generic
+`variable_lsf_not_supported_by_fitter` readiness blocker before fitting; it is
+provenance, not an applied convolution. Keeping `wdisp` unattached and choosing
+an explicit constant R remains a labelled quicklook approximation and is still
+blocked for reviewed analysis. UVES-POP spectra carry a nominal `R=80000`
 descriptor with cautionary metadata; wavelength medium and frame remain
 unknown unless supplied by the user or external provenance. Gaia FGK Benchmark
 Stars Library spectra are separate validation products: the bundled examples
@@ -579,7 +582,10 @@ use the public common-resolution, normalized, R=42,000 HARPS files over
 based on line-center validation of the example files, while recording that this
 is a reader-profile convention rather than a hidden archive correction. The
 literature parameters are recorded for comparison rather than used as hidden
-fit priors. Run
+fit priors. The validation runner treats fundamental GBSv3 Teff/logg as the
+primary independent tier, spectroscopic [Fe/H] as a secondary comparison, and
+catalogue spectral type as morphology rather than a direct three-parameter fit
+target. Run
 `python scripts/gaia_benchmark_validation.py --output-json /tmp/gbs.json --output-csv /tmp/gbs.csv --output-summary-plot /tmp/gbs.png`
 for the audit-only benchmark summary; add `--run-fits` only when you want the
 PHOENIX recovery comparison. Failure diagnosis should use explicit options
@@ -596,6 +602,12 @@ separately. Optimizer success, parameter tolerance, local-search coverage,
 formal residual quality, identifiability evidence, and scientific-review
 status are also separate; a tolerance pass with incomplete search coverage is
 reported as provisional.
+
+The bundled Gaia targets are an immutable development cohort because their
+fits have already informed method development. Future locked holdouts must be
+grouped at the unique-star level across aliases, instruments, releases and
+repeat observations. Source-level capability and reference-tier prerequisites
+are recorded in `examples/data/validation_cohorts/source_registry_v1.json`.
 Wavelengths are represented in Angstrom, uncertainties as 1-sigma standard
 deviations, and masks use `True` to mean a valid/usable pixel. Observer-motion
 frame and stellar-rest correction status are tracked independently. Instrumental

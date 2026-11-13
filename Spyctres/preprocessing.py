@@ -2658,6 +2658,20 @@ READINESS_FLAG_ACTIONS = {
             "current PHOENIX likelihood does not apply it."
         ),
     },
+    "variable_lsf_not_supported_by_fitter": {
+        "severity": "blocker",
+        "action": (
+            "Do not use this product for atmospheric-parameter accuracy claims "
+            "until its tabulated wavelength-dependent LSF is applied by the "
+            "forward model, or a scientifically justified restricted constant-"
+            "LSF product is selected explicitly."
+        ),
+        "detail": (
+            "Recording a tabulated resolution curve is not equivalent to "
+            "convolving the model with it; the current PHOENIX fitter accepts "
+            "only one constant Gaussian LSF per segment."
+        ),
+    },
     "lsf_undersampled": {
         "severity": "blocker",
         "action": (
@@ -2811,6 +2825,7 @@ READINESS_INTENT_BLOCKERS = {
     "quicklook_classification": {
         "no_fitted_pixels",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "artifact_review_required",
         "lsf_undersampled",
         "archive_mask_fraction_high",
@@ -2819,6 +2834,7 @@ READINESS_INTENT_BLOCKERS = {
     "atmospheric_parameters": {
         "no_fitted_pixels",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "wave_medium_unknown",
         "artifact_review_required",
         "lsf_undersampled",
@@ -2828,6 +2844,7 @@ READINESS_INTENT_BLOCKERS = {
     "radial_velocity": {
         "no_fitted_pixels",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "wave_medium_unknown",
         "observer_frame_unknown",
         "stellar_rest_status_unknown",
@@ -2842,6 +2859,7 @@ READINESS_INTENT_BLOCKERS = {
         "no_fitted_pixels",
         "missing_uncertainties",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "wave_medium_unknown",
         "observer_frame_unknown",
         "stellar_rest_status_unknown",
@@ -2880,6 +2898,11 @@ READINESS_FLAG_LIMITATIONS = {
     ),
     "sdss_wdisp_lsf_not_applied": (
         "precision_sdss_line_widths",
+        "wavelength_dependent_lsf_claims",
+    ),
+    "variable_lsf_not_supported_by_fitter": (
+        "precision_line_widths",
+        "atmospheric_parameter_accuracy",
         "wavelength_dependent_lsf_claims",
     ),
     "lsf_undersampled": (
@@ -3146,6 +3169,8 @@ def _segment_readiness(
             flags.append("{0}_unknown".format(key))
     if not resolution_meta.get("present"):
         flags.append("resolution_assumption_required")
+    elif str(resolution_meta.get("mode", "constant")).lower() != "constant":
+        flags.append("variable_lsf_not_supported_by_fitter")
     if lsf_provenance.get("lsf_source") == "sdss_wdisp_not_applied":
         flags.append("sdss_wdisp_lsf_not_applied")
     if lsf_undersampled:
@@ -3337,6 +3362,7 @@ def audit_spectrum_for_fit(
     hard_flags = {
         "no_fitted_pixels",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "wave_medium_unknown",
         "observer_frame_unknown",
         "stellar_rest_status_unknown",
@@ -3387,6 +3413,7 @@ ANALYSIS_READINESS_BLOCKING_FLAGS = frozenset(
         "no_fitted_pixels",
         "missing_uncertainties",
         "resolution_assumption_required",
+        "variable_lsf_not_supported_by_fitter",
         "wave_medium_unknown",
         "observer_frame_unknown",
         "stellar_rest_status_unknown",

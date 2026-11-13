@@ -3,6 +3,39 @@
   "description": "Curated Gaia FGK Benchmark Stars Library subset for Spyctres validation examples. These are public GBSv3 R=42000 normalized spectra over 480-680 nm from several source instruments.",
   "source_page": "https://www.blancocuaresma.com/s/benchmarkstars",
   "source_release": "2025/GBSv3",
+  "cohort_policy": {
+    "cohort_id": "spyctres_gbsv3_development_v1",
+    "cohort_role": "development",
+    "immutable_development_set": true,
+    "holdout_eligible": false,
+    "grouping_unit": "unique_star",
+    "reason": "All bundled targets have been inspected or used during method development and must remain excluded from future locked holdouts, including aliases and observations from other instruments."
+  },
+  "reference_policy": {
+    "teff": {
+      "tier": "primary_independent",
+      "method": "fundamental relation using angular diameter and bolometric flux",
+      "source": "soubiran2024_gbsv3"
+    },
+    "logg": {
+      "tier": "primary_independent",
+      "method": "fundamental relation using mass and radius",
+      "source": "soubiran2024_gbsv3"
+    },
+    "feh": {
+      "tier": "secondary_spectroscopic",
+      "method": "homogeneous LTE spectral abundance analysis",
+      "source": "casamiquela2026_gbs_v3_spectral_library"
+    },
+    "rv_kms": {
+      "tier": "unavailable",
+      "method": "no independent RV reference stored in this manifest"
+    },
+    "spectral_type": {
+      "tier": "morphology_only",
+      "method": "catalogue spectral and luminosity class; not inferred directly from Teff/logg/[Fe/H]"
+    }
+  },
   "reader": "gaia_benchmark",
   "product": {
     "format": "gzip-compressed whitespace text",
@@ -146,6 +179,10 @@
       "feh_ref": -0.56,
       "snr": 1018.0,
       "source_quality_flag": "Indirect theta",
+      "reference_tier_overrides": {
+        "teff": "secondary_indirect",
+        "logg": "secondary_indirect"
+      },
       "validation_role": "reference_flagged",
       "notes": "K subgiant coverage. Kept outside ordinary aggregate accuracy statistics because the source table flags its angular diameter as indirect."
     },
@@ -214,6 +251,10 @@
       "feh_ref": -1.14,
       "snr": 274.0,
       "source_quality_flag": "Indirect theta",
+      "reference_tier_overrides": {
+        "teff": "secondary_indirect",
+        "logg": "secondary_indirect"
+      },
       "validation_role": "metal_poor_stress",
       "notes": "Moderately metal-poor F dwarf. Report separately because composition mismatch is more consequential and the source table flags its angular diameter as indirect."
     },
